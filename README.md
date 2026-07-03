@@ -7,7 +7,6 @@ Raspbot 姿态识别与姿态跟随控制工程。仓库的可维护功能代码
 ```text
 .
 ├── posture_demo.py                 # 姿态识别预览入口，只调用 raspbot_posture.cli
-├── posture_robot_control_demo.py   # 姿态跟随控制入口，只调用 raspbot_posture.robot_cli
 ├── raspbot_posture/                # 唯一功能包体
 └── dev_tests/                      # 后续开发、联调、测试脚本
 ```
