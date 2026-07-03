@@ -2,12 +2,9 @@
 
 import argparse
 
-from .app import run_posture_demo
 
-
-def parse_args():
-    """Parse command-line arguments for Raspberry Pi low-load preview mode."""
-    parser = argparse.ArgumentParser(description='Raspbot body posture demo with MediaPipe Pose')
+def add_posture_arguments(parser):
+    """Add shared camera, preview, and posture-analysis arguments."""
     parser.add_argument('--source', default='0', help='camera source, usually 0')
     parser.add_argument('--width', type=int, default=640, help='camera width')
     parser.add_argument('--height', type=int, default=480, help='camera height')
@@ -38,10 +35,24 @@ def parse_args():
     parser.add_argument('--squat-down-angle', type=float, default=145.0, help='knee angle threshold for squat down')
     parser.add_argument('--squat-up-angle', type=float, default=155.0, help='knee angle threshold for standing up')
     parser.add_argument('--squat-cooldown', type=float, default=0.35, help='minimum seconds between two squat counts')
+    return parser
+
+
+def build_parser():
+    """Build the posture demo argument parser."""
+    parser = argparse.ArgumentParser(description='Raspbot body posture demo with MediaPipe Pose')
+    return add_posture_arguments(parser)
+
+
+def parse_args():
+    """Parse command-line arguments for Raspberry Pi low-load preview mode."""
+    parser = build_parser()
     return parser.parse_args()
 
 
 def main():
     """Run the posture demo using CLI arguments."""
-    run_posture_demo(parse_args())
+    args = parse_args()
+    from .app import run_posture_demo
 
+    run_posture_demo(args)

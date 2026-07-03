@@ -1,2 +1,6 @@
 /CODEBASE_NOTES.md
 /project_demo
+/test_demo
+__pycache__/
+*.pyc
+.DS_Store
