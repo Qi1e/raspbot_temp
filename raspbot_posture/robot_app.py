@@ -19,6 +19,9 @@ def build_robot_controller(args, analysis_state, stop_event):
 
 def print_control_summary(args):
     """Print the active robot-control mode and important tuning knobs."""
+    if args.run_mode == "posture":
+        print("Run mode: posture preview. Pose inference is enabled; robot control is disabled.")
+        return
     if args.run_mode == "camera":
         print("Run mode: camera only. Pose inference and robot control are disabled.")
         return
@@ -40,7 +43,7 @@ def run_robot_control_demo(args):
     run_posture_demo(
         args,
         control_factory=control_factory,
-        start_label="Posture robot control demo started.",
-        window_title="Raspbot posture robot control demo",
+        start_label="Raspbot posture demo started.",
+        window_title="Raspbot posture demo",
         summary_printer=print_control_summary,
     )

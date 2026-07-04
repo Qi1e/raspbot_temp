@@ -1,4 +1,4 @@
-"""Command-line entrypoint for posture robot control."""
+"""Unified command-line entrypoint for posture preview and robot control modes."""
 
 import argparse
 
@@ -9,9 +9,12 @@ def add_robot_control_arguments(parser):
     """Add robot-control mode and tuning arguments."""
     parser.add_argument(
         "--run-mode",
-        choices=["camera", "steering", "full"],
-        default="camera",
-        help="camera: camera preview only; steering: pan/tilt and body turning; full: also enable distance control",
+        choices=["posture", "camera", "steering", "full"],
+        default="posture",
+        help=(
+            "posture: pose preview; camera: camera preview only; "
+            "steering: pan/tilt and body turning; full: also enable distance control"
+        ),
     )
 
     parser.add_argument("--dry-run-control", action="store_true", help="print robot commands without touching hardware")
@@ -62,20 +65,20 @@ def add_robot_control_arguments(parser):
 
 
 def build_parser():
-    """Build the posture robot control argument parser."""
-    parser = argparse.ArgumentParser(description="Raspbot posture tracking with tunable robot control")
+    """Build the unified posture demo argument parser."""
+    parser = argparse.ArgumentParser(description="Raspbot posture demo with optional robot control modes")
     add_posture_arguments(parser)
     add_robot_control_arguments(parser)
     return parser
 
 
 def parse_args():
-    """Parse command-line arguments for posture robot control."""
+    """Parse command-line arguments for the unified posture demo."""
     return build_parser().parse_args()
 
 
 def main():
-    """Run the posture robot control demo using CLI arguments."""
+    """Run the unified posture demo using CLI arguments."""
     args = parse_args()
     from .robot_app import run_robot_control_demo
 
