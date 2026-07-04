@@ -81,8 +81,15 @@ def add_arguments(parser):
     parser.add_argument('--burpee-cooldown', type=float, default=0.8, help='minimum seconds between burpee counts')
 
     parser.add_argument('--record-path', default='', help='optional JSONL path for action and joint-angle samples')
+    parser.add_argument('--record-url', default='', help='optional HTTP/HTTPS endpoint for NDJSON batch upload')
+    parser.add_argument('--record-session-id', default='', help='optional session id for local and remote records')
+    parser.add_argument('--record-device-id', default='raspbot', help='device id included in local and remote records')
     parser.add_argument('--record-interval', type=float, default=0.1, help='minimum seconds between recorded samples')
     parser.add_argument('--record-min-confidence', type=float, default=0.55, help='minimum target confidence for recording')
+    parser.add_argument('--record-upload-batch-size', type=int, default=10, help='samples per remote NDJSON upload batch')
+    parser.add_argument('--record-upload-interval', type=float, default=1.0, help='maximum seconds between remote upload batches')
+    parser.add_argument('--record-upload-queue-size', type=int, default=300, help='maximum queued remote record events')
+    parser.add_argument('--record-keypoints', action='store_true', help='include selected joint coordinates in records')
     return parser
 
 
@@ -90,6 +97,38 @@ def build_parser():
     """Build the HYROX demo argument parser."""
     parser = argparse.ArgumentParser(description='Raspbot HYROX action demo')
     return add_arguments(parser)
+
+
+def build_record_config(args):
+    """Return metadata saved with session_start for backend scoring."""
+    return {
+        'source': str(args.source),
+        'width': args.width,
+        'height': args.height,
+        'mirror': args.mirror,
+        'model_complexity': args.model_complexity,
+        'inference_fps': args.inference_fps,
+        'record_interval': args.record_interval,
+        'record_keypoints': args.record_keypoints,
+        'min_visibility': args.min_visibility,
+        'squat': {
+            'down_angle': args.squat_down_angle,
+            'up_angle': args.squat_up_angle,
+            'min_down_time': args.squat_min_down_time,
+        },
+        'lunge': {
+            'down_angle': args.lunge_down_angle,
+            'up_angle': args.lunge_up_angle,
+            'min_angle_gap': args.lunge_min_angle_gap,
+            'min_stance_width': args.lunge_min_stance_width,
+        },
+        'burpee': {
+            'stage_timeout': args.burpee_stage_timeout,
+            'broad_jump_min_dx': args.burpee_broad_jump_min_dx,
+            'flat_floor_width_ratio': args.burpee_flat_floor_width_ratio,
+            'flat_floor_height_max': args.burpee_flat_floor_height_max,
+        },
+    }
 
 
 def run(args):
@@ -126,7 +165,19 @@ def run(args):
     )
     extractor = PoseFeatureExtractor(min_visibility=args.min_visibility)
     registry = build_action_registry(args)
-    recorder = JsonlRecorder(args.record_path, args.record_interval, args.record_min_confidence)
+    recorder = JsonlRecorder(
+        args.record_path,
+        args.record_interval,
+        args.record_min_confidence,
+        url=args.record_url,
+        session_id=args.record_session_id,
+        device_id=args.record_device_id,
+        upload_batch_size=args.record_upload_batch_size,
+        upload_interval=args.record_upload_interval,
+        upload_queue_size=args.record_upload_queue_size,
+        include_keypoints=args.record_keypoints,
+    )
+    recorder.start(config=build_record_config(args))
     camera_fps_meter = FpsMeter()
     inference_fps_meter = FpsMeter()
     inference_interval = 0.0 if args.inference_fps <= 0 else 1.0 / args.inference_fps
@@ -148,7 +199,11 @@ def run(args):
         'Press Ctrl+C to stop.'
     )
     if recorder.enabled:
-        print(f'Recording JSONL samples to: {recorder.path}')
+        if recorder.path:
+            print(f'Recording JSONL samples to: {recorder.path}')
+        if recorder.remote_enabled:
+            print(f'Uploading NDJSON record batches to: {recorder.url}')
+        print(f'Record session id: {recorder.session_id}')
 
     try:
         while True:
@@ -173,7 +228,7 @@ def run(args):
                     features = extractor.extract(results.pose_landmarks.landmark)
                     posture = classify_posture(features)
                     actions = registry.update(features, posture)
-                    recorder.record(posture, features, actions)
+                    recorder.record(posture, features, actions, results.pose_landmarks.landmark)
                 else:
                     landmarks = None
                     features = None
@@ -209,6 +264,7 @@ def run(args):
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
     finally:
+        recorder.close()
         pose.close()
         camera.release()
         if preview_server:

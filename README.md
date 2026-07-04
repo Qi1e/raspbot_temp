@@ -81,7 +81,7 @@ hyrox_action_demo.py      # HYROX 动作识别和记录入口
 hyrox_actions/
 ├── detectors.py          # 深蹲、箭步蹲、波比跳计数状态机
 ├── pose_features.py      # 关键关节角度和人体框特征
-├── recorder.py           # JSONL 角度和动作记录
+├── recorder.py           # JSONL/NDJSON 角度、动作记录和可选远端上传
 └── overlay.py            # 预览叠字
 ```
 
@@ -90,6 +90,19 @@ hyrox_actions/
 ```bash
 python3 hyrox_action_demo.py --source 0 --record-path records/session.jsonl
 ```
+
+如需把记录实时传到电脑后端，可先约定电脑端监听 `8765` 端口，并提供一个接收 `POST /ingest` 的 demo 服务。receiver 脚本可以放在仓库外，不需要提交到本仓库。树莓派端命令示例：
+
+```bash
+python3 hyrox_action_demo.py \
+  --source 0 \
+  --record-path records/local_backup.jsonl \
+  --record-url http://<电脑IP>:8765/ingest \
+  --record-device-id raspbot_01 \
+  --record-keypoints
+```
+
+远端上传使用 `application/x-ndjson` 批量 HTTP POST，每行一个 JSON 事件；本地 `--record-path` 仍会保留完整备份。上传在后台线程中进行，后端断开不会阻塞动作识别和小车运动控制。当前版本不依赖额外 WebSocket 包，后续前端需要实时展示时，可以由电脑后端把收到的数据再转发给前端。
 
 默认推理上限为 12 FPS，默认记录间隔为 0.1 秒。树莓派压力较大时可降回：
 
@@ -101,7 +114,7 @@ python3 hyrox_action_demo.py --source 0 --inference-fps 8 --record-interval 0.2
 
 波比跳按“俯卧撑起身 + 相对摄像头左右方向立定跳远”计数，需经历俯卧撑下降、俯卧撑推起、起身、横向位移、落地阶段，默认 `--burpee-stage-timeout` 为 7.0 秒。`floor_entry` 只作为内部弱候选，不再作为正式显示或阻挡状态；俯卧撑入口优先要求地面姿态、肘角和伸腿证据共同成立。如果低机位导致手臂关键点不可见，只有非常扁平且贴近地面的目标框才允许用 `--burpee-flat-floor-*` 严格入口进入 `pushup_down`，避免深蹲或箭步蹲低位误进波比跳。
 
-记录文件为 JSONL，每行包含时间戳、当前动作阶段、关键关节角度、人体框和计数状态，供后端动作完成度计算使用。部署到树莓派时，把 `hyrox_action_demo.py` 和 `hyrox_actions/` 放到 Pi 项目目录中，与 `raspbot_posture/` 同级即可。
+记录文件为 JSONL/NDJSON，每行包含 `type`、`session_id`、时间戳、当前动作阶段、关键关节角度、人体框、可见性和计数状态；开启 `--record-keypoints` 时还会记录肩、肘、腕、髋、膝、踝等关键点坐标，供后端动作完成度计算使用。记录事件包括 `session_start`、`sample`、`rep_event` 和 `session_end`。部署到树莓派时，把 `hyrox_action_demo.py` 和 `hyrox_actions/` 放到 Pi 项目目录中，与 `raspbot_posture/` 同级即可。
 
 ## 已实现功能
 
