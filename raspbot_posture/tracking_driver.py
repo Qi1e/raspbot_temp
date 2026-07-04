@@ -18,9 +18,10 @@ class ServoUpdate:
 class TrackingRobotDriver:
     """Small stateful hardware wrapper for continuous pan/tilt and wheel control."""
 
-    def __init__(self, live=False, i2c_bus=1, print_motors=False):
+    def __init__(self, live=False, i2c_bus=1, print_motors=False, print_servos=False):
         self.live = bool(live)
         self.print_motors = bool(print_motors)
+        self.print_servos = bool(print_servos)
         self.bot = None
         if live:
             from .hardware import Raspbot
@@ -28,6 +29,8 @@ class TrackingRobotDriver:
             self.bot = Raspbot(i2c_bus=i2c_bus)
         self.pan_angle = 90.0
         self.tilt_angle = 50.0
+        self.last_servo_angles = {}
+        self.last_wheel_speeds = None
         self.last_servo_motion_at = 0.0
         self.last_servo_update_at = 0.0
         self.yaw_servo_compensation_residual = 0.0
@@ -49,7 +52,11 @@ class TrackingRobotDriver:
         elif servo_id == 2:
             self.tilt_angle = angle
         rounded = int(round(angle))
-        print(f"servo {servo_id} -> {rounded} {reason}".rstrip())
+        if self.last_servo_angles.get(servo_id) == rounded:
+            return
+        self.last_servo_angles[servo_id] = rounded
+        if self.print_servos:
+            print(f"servo {servo_id} -> {rounded} {reason}".rstrip())
         if self.bot is not None:
             self.bot.Ctrl_Servo(servo_id, rounded)
 
@@ -158,6 +165,9 @@ class TrackingRobotDriver:
 
     def set_wheel_speeds(self, speeds, reason=""):
         values = speeds.as_list()
+        if self.last_wheel_speeds == values:
+            return
+        self.last_wheel_speeds = values
         if self.print_motors:
             print(f"motors {values} {reason}".rstrip())
         if self.bot is not None:

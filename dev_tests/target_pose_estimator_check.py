@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
-"""Replay calibration CSV through the package target pose estimator."""
+"""Replay calibration CSV through the test-only target pose estimator."""
 
 import argparse
 import csv
@@ -9,7 +9,7 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-from raspbot_posture.tracking_estimator import TargetPoseConfig, TargetTrackingInputBuilder
+from .target_pose_estimator import TargetPoseConfig, TargetTrackingInputBuilder
 
 
 def build_parser():

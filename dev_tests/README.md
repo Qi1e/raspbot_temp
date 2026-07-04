@@ -29,13 +29,13 @@ http://<raspberry-pi-ip>:8080/
 
 脚本会默认把 1 号 pan 舵机固定到正前方 90 度，把 2 号 tilt 舵机移动到 `--tilt-angle`，并把这两个角度写入 CSV。`--confirm-time` 是确认阶段，只推送摄像头画面和识别框，不写入 CSV；确认测试者已经出现在画面中后，脚本会进入 warmup，然后正式采集。把人移动到已测量距离，例如 0.6m、0.8m、1.0m、1.2m、1.5m，然后每个距离运行一次命令。脚本会把样本追加写入 `dev_tests/target_distance_samples.csv`，并输出基于人体面积、肩宽、躯干高度的简化距离模型，以及推荐的 `--target-area-min` 和 `--target-area-max`。
 
-回放 CSV 检查包内估距函数：
+回放 CSV 检查当前测试版估距函数：
 
 ```bash
 python3 -m dev_tests.target_pose_estimator_check
 ```
 
-估距和追踪输入实现已经进入 `raspbot_posture.tracking_estimator`；`dev_tests/target_pose_estimator.py` 只保留兼容导入。核心入口是 `TargetTrackingInputBuilder`，输出包含摄像头 pan/tilt 偏转方向、车身转向方向、距离误差、小车前进/后退方向和底盘平移角度。
+估距和追踪输入工具类暂时保留在 `dev_tests/target_pose_estimator.py`，测试通过后再整理进 `raspbot_posture/` 包体。核心入口是 `TargetTrackingInputBuilder`，输出包含摄像头 pan/tilt 偏转方向、车身转向方向、距离误差、小车前进/后退方向和底盘平移角度。
 
 同步追踪可行性 Demo：
 
@@ -97,4 +97,4 @@ python3 -m dev_tests.distance_control_demo --input-mode camera --live --log-dir 
 | `--log-interval` | `0.05` | CSV 最小记录间隔，单位秒 |
 | `--print-motors` | 关闭 | 打印每轮四电机速度，默认关闭以减少控制台刷屏 |
 
-真实摄像头模式直接调用 `raspbot_posture` 包内摄像头、姿态识别、人体目标、预览、估距、轮速混合、距离规划和同步追踪驱动接口；demo 只负责实车验证和参数调试。
+真实摄像头模式直接调用 `raspbot_posture` 包内摄像头、姿态识别、人体目标和预览接口；跟踪估距仍保留在 demo 侧验证。

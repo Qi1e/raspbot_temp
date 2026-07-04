@@ -135,7 +135,7 @@ class DistancePlanner:
 
         self.next_plan_at = now + self.args.plan_interval
         self.goal = self.plan(sample, now)
-        if getattr(self.args, "print_planner", True):
+        if getattr(self.args, "print_planner", False):
             print(f"planner goal={self.goal}")
         return self.goal
 

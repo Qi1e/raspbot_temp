@@ -3,6 +3,7 @@
 """Demo for synchronized camera pan/tilt and chassis follow control."""
 
 import argparse
+import math
 import time
 from dataclasses import dataclass
 
@@ -432,6 +433,8 @@ def build_parser():
     parser.add_argument("--log-prefix", default="tracking", help="prefix for generated log files")
     parser.add_argument("--log-interval", type=float, default=0.05, help="minimum seconds between logged control rows")
     parser.add_argument("--print-motors", action="store_true", help="print every wheel-speed command for debugging")
+    parser.add_argument("--print-servos", action="store_true", help="print every servo command for debugging")
+    parser.add_argument("--print-planner", action="store_true", help="print each distance planner goal")
 
     parser.add_argument("--i2c-bus", type=int, default=1)
     parser.add_argument("--live", action="store_true")
@@ -454,7 +457,12 @@ def main():
         logger = TrackingLogger(args)
         provider = build_input_provider(args)
         planner = DistancePlanner(args)
-        driver = TrackingRobotDriver(live=args.live, i2c_bus=args.i2c_bus, print_motors=args.print_motors)
+        driver = TrackingRobotDriver(
+            live=args.live,
+            i2c_bus=args.i2c_bus,
+            print_motors=args.print_motors,
+            print_servos=args.print_servos,
+        )
         driver.configure_servos(args.pan_center, args.tilt_center)
         started_at = time.time()
         interval = max(0.02, args.control_interval)
