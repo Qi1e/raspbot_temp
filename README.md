@@ -72,6 +72,37 @@ raspbot_posture/
 └── robot_cli.py        # 控制版参数
 ```
 
+## HYROX 动作扩展
+
+HYROX 扩展以旁路方式新增，不修改 `raspbot_posture/` 包体：
+
+```text
+hyrox_action_demo.py      # HYROX 动作识别和记录入口
+hyrox_actions/
+├── detectors.py          # 深蹲、箭步蹲、波比跳计数状态机
+├── pose_features.py      # 关键关节角度和人体框特征
+├── recorder.py           # JSONL 角度和动作记录
+└── overlay.py            # 预览叠字
+```
+
+运行示例：
+
+```bash
+python3 hyrox_action_demo.py --source 0 --record-path records/session.jsonl
+```
+
+默认推理上限为 12 FPS，默认记录间隔为 0.1 秒。树莓派压力较大时可降回：
+
+```bash
+python3 hyrox_action_demo.py --source 0 --inference-fps 8 --record-interval 0.2
+```
+
+扩展中的深蹲和箭步蹲使用互斥仲裁，明显的 split-stance 骨架特征会优先 favour 箭步蹲，并阻止深蹲抢计数。深蹲默认 `--squat-down-angle` 为 152，并优先看对称腿部骨架与膝角，降低低机位下髋部下沉特征失真的影响；`--squat-min-down-time` 默认 0.4 秒，避免单帧抽搐造成深蹲误计。箭步蹲要求更明确的脚踝展开或髋脚偏移，减少正面深蹲被膝角抖动抢成箭步蹲。
+
+波比跳按“俯卧撑起身 + 相对摄像头左右方向立定跳远”计数，需经历俯卧撑下降、俯卧撑推起、起身、横向位移、落地阶段，默认 `--burpee-stage-timeout` 为 7.0 秒。`floor_entry` 只作为内部弱候选，不再作为正式显示或阻挡状态；俯卧撑入口优先要求地面姿态、肘角和伸腿证据共同成立。如果低机位导致手臂关键点不可见，只有非常扁平且贴近地面的目标框才允许用 `--burpee-flat-floor-*` 严格入口进入 `pushup_down`，避免深蹲或箭步蹲低位误进波比跳。
+
+记录文件为 JSONL，每行包含时间戳、当前动作阶段、关键关节角度、人体框和计数状态，供后端动作完成度计算使用。部署到树莓派时，把 `hyrox_action_demo.py` 和 `hyrox_actions/` 放到 Pi 项目目录中，与 `raspbot_posture/` 同级即可。
+
 ## 已实现功能
 
 - 摄像头采集、镜像、本地窗口和网页 MJPEG 预览。
@@ -102,7 +133,8 @@ raspbot_posture/
 dev_tests/
 ├── camera_preview.py       # 仅摄像头预览烟测
 ├── steering_dry_run.py     # 转向控制 dry run
-└── full_mode_dry_run.py    # full 模式 dry run
+├── full_mode_dry_run.py    # full 模式 dry run
+└── hyrox_detector_dry_run.py # HYROX 动作计数器合成数据 dry run
 ```
 
 运行示例：
@@ -111,6 +143,7 @@ dev_tests/
 python3 dev_tests/camera_preview.py
 python3 dev_tests/steering_dry_run.py
 python3 dev_tests/full_mode_dry_run.py
+python3 -m dev_tests.hyrox_detector_dry_run
 ```
 
 ## 维护原则
