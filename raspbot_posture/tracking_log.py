@@ -50,6 +50,12 @@ LOG_FIELDS = [
     "wheel_m3",
     "motion_goal_active",
     "motion_goal_reason",
+    "obstacle_enabled",
+    "obstacle_active",
+    "obstacle_distance_mm",
+    "obstacle_phase",
+    "obstacle_reason",
+    "obstacle_cooldown_s",
     "servo_idle_s",
     "tracking_reason",
 ]
@@ -118,6 +124,7 @@ class TrackingLogger:
         move_direction_degrees,
         wheels,
         driver,
+        obstacle_status=None,
     ):
         if not self.enabled:
             return
@@ -133,6 +140,7 @@ class TrackingLogger:
         target = tracking.target
         target_center_x = 0.5 + getattr(target, "x_offset", 0.0)
         target_center_y = 0.5 + getattr(target, "y_offset", 0.0)
+        obstacle_distance = "" if obstacle_status is None or obstacle_status.distance_mm is None else f"{obstacle_status.distance_mm:.1f}"
         row = {
             "timestamp": f"{now:.3f}",
             "elapsed_s": f"{now - started_at:.3f}",
@@ -176,6 +184,12 @@ class TrackingLogger:
             "wheel_m3": wheels.m3,
             "motion_goal_active": goal.active,
             "motion_goal_reason": goal.reason,
+            "obstacle_enabled": bool(getattr(obstacle_status, "enabled", False)),
+            "obstacle_active": bool(getattr(obstacle_status, "active", False)),
+            "obstacle_distance_mm": obstacle_distance,
+            "obstacle_phase": getattr(obstacle_status, "phase", ""),
+            "obstacle_reason": getattr(obstacle_status, "reason", ""),
+            "obstacle_cooldown_s": f"{getattr(obstacle_status, 'cooldown_remaining_s', 0.0):.3f}",
             "servo_idle_s": f"{sample.servo_idle_s:.3f}",
             "tracking_reason": sample.tracking_reason,
         }

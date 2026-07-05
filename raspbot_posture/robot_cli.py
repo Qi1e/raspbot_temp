@@ -1,6 +1,7 @@
 """Unified command-line entrypoint for posture preview and robot control modes."""
 
 import argparse
+import sys
 
 from .cli import add_posture_arguments
 
@@ -17,7 +18,7 @@ def add_robot_control_arguments(parser):
         ),
     )
 
-    parser.set_defaults(dry_run_control=True)
+    parser.set_defaults(dry_run_control=None)
     parser.add_argument("--dry-run-control", dest="dry_run_control", action="store_true", help="print robot commands without touching hardware")
     parser.add_argument("--live-control", dest="dry_run_control", action="store_false", help="send robot commands to Raspbot hardware")
     parser.add_argument("--control-debug", action="store_true", help="print target and control decisions")
@@ -29,7 +30,7 @@ def add_robot_control_arguments(parser):
     parser.add_argument("--target-min-confidence", type=float, default=0.55)
 
     parser.add_argument("--pan-center", type=float, default=90.0)
-    parser.add_argument("--tilt-center", type=float, default=80.0)
+    parser.add_argument("--tilt-center", type=float, default=30.0)
     parser.add_argument("--tilt-rest", type=float, default=25.0)
     parser.add_argument("--pan-min", type=float, default=20.0)
     parser.add_argument("--pan-max", type=float, default=160.0)
@@ -70,9 +71,9 @@ def add_robot_control_arguments(parser):
     parser.add_argument("--max-input-age", type=float, default=0.4)
     parser.add_argument("--min-confidence", type=float, default=0.3)
     parser.add_argument("--servo-idle-required", type=float, default=0.4)
-    parser.add_argument("--desired-min-distance", type=float, default=0.8)
-    parser.add_argument("--desired-max-distance", type=float, default=1.2)
-    parser.add_argument("--desired-distance", type=float, default=1.0)
+    parser.add_argument("--desired-min-distance", type=float, default=2.7)
+    parser.add_argument("--desired-max-distance", type=float, default=3.3)
+    parser.add_argument("--desired-distance", type=float, default=3.0)
     parser.add_argument("--max-reasonable-distance", type=float, default=10.0)
     parser.add_argument("--estimator-min-confidence", type=float, default=0.7)
     parser.add_argument("--distance-deadband", type=float, default=0.08)
@@ -105,25 +106,81 @@ def add_robot_control_arguments(parser):
     parser.add_argument("--print-servos", action="store_true")
     parser.add_argument("--print-planner", action="store_true")
     parser.add_argument("--i2c-bus", type=int, default=1)
+    parser.add_argument("--enable-obstacle-avoidance", action="store_true")
+    parser.add_argument("--ultrasonic-poll-interval", type=float, default=0.05)
+    parser.add_argument("--ultrasonic-filter-size", type=int, default=5)
+    parser.add_argument("--obstacle-enter-mm", type=float, default=280.0)
+    parser.add_argument("--obstacle-too-close-mm", type=float, default=240.0)
+    parser.add_argument("--obstacle-exit-mm", type=float, default=430.0)
+    parser.add_argument("--obstacle-enter-stable-count", type=int, default=3)
+    parser.add_argument("--obstacle-exit-stable-count", type=int, default=5)
+    parser.add_argument("--obstacle-cooldown", type=float, default=1.5)
+    parser.add_argument("--obstacle-speed", type=float, default=18.0)
+    parser.add_argument("--obstacle-return-speed", type=float, default=16.0)
+    parser.add_argument("--obstacle-backward-speed", type=float, default=16.0)
+    parser.add_argument("--obstacle-pulse", type=float, default=0.25)
+    parser.add_argument("--obstacle-max-steps", type=int, default=15)
+    parser.add_argument("--obstacle-max-active-time", type=float, default=6.0)
+    parser.add_argument("--obstacle-fail-backup-time", type=float, default=0.5)
+    parser.add_argument("--obstacle-fail-stop-time", type=float, default=1.0)
+    parser.add_argument("--obstacle-left-direction-degrees", type=float, default=135.0)
+    parser.add_argument("--obstacle-right-direction-degrees", type=float, default=45.0)
+    parser.add_argument("--obstacle-backward-direction-degrees", type=float, default=270.0)
     return parser
 
 
 def build_parser():
     """Build the unified posture demo argument parser."""
     parser = argparse.ArgumentParser(description="Raspbot posture demo with optional robot control modes")
+    parser.add_argument("--voice-child", action="store_true", help=argparse.SUPPRESS)
     add_posture_arguments(parser)
     add_robot_control_arguments(parser)
     return parser
 
 
-def parse_args():
+def _uses_voice_supervisor(args, argv):
+    return not args.voice_child and len(argv) == 0
+
+
+def parse_args(argv=None):
     """Parse command-line arguments for the unified posture demo."""
-    return build_parser().parse_args()
+    if argv is None:
+        argv = sys.argv[1:]
+    else:
+        argv = list(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not _uses_voice_supervisor(args, argv):
+        apply_control_default(args, argv)
+    return args
 
 
-def main():
+def apply_control_default(args, argv):
+    """Default explicit robot modes to live control while keeping bare startup safe."""
+    argv = list(argv)
+    explicit_control = "--dry-run-control" in argv or "--live-control" in argv
+    explicit_run_mode = "--run-mode" in argv
+    if args.dry_run_control is None:
+        args.dry_run_control = not (explicit_run_mode and args.run_mode in ("steering", "full"))
+    if not explicit_control and explicit_run_mode and args.run_mode in ("steering", "full"):
+        print("Robot hardware control is live. Add --dry-run-control to disable motor/servo output.")
+    elif args.dry_run_control and args.run_mode in ("steering", "full"):
+        print("Robot hardware control is dry-run. Add --live-control to send motor/servo output.")
+    return args
+
+
+def main(argv=None):
     """Run the unified posture demo using CLI arguments."""
-    args = parse_args()
+    if argv is None:
+        argv = sys.argv[1:]
+    else:
+        argv = list(argv)
+    args = parse_args(argv)
+    if _uses_voice_supervisor(args, argv):
+        from .voice_supervisor import run_voice_supervisor
+
+        raise SystemExit(run_voice_supervisor())
+
     from .robot_app import run_robot_control_demo
 
     run_robot_control_demo(args)

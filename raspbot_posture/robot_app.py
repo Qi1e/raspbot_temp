@@ -32,12 +32,15 @@ def print_control_summary(args):
         f"pan_deadzone={args.pan_deadzone}, tilt_deadzone={args.tilt_deadzone}, "
         f"servo_step={args.servo_step}, body_turn_speed={args.body_turn_speed}, "
         f"body_pulse={args.body_pulse}, body_cooldown={args.body_cooldown}, "
-        f"distance_control={args.distance_control}"
+        f"distance_control={args.distance_control}, "
+        f"obstacle_avoidance={getattr(args, 'enable_obstacle_avoidance', False)}"
     )
 
 
 def run_robot_control_demo(args):
     """Run posture preview plus optional robot steering and distance control."""
+    if getattr(args, "dry_run_control", None) is None:
+        args.dry_run_control = True
     apply_robot_run_mode(args)
     if args.run_mode == "full":
         from .tracking_app import run_full_tracking_demo
