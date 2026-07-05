@@ -7,6 +7,7 @@ working on minimal Raspberry Pi environments.
 import socket
 import threading
 import time
+import json
 
 import cv2
 
@@ -34,12 +35,16 @@ class PreviewState:
         self.min_interval = 0 if fps <= 0 else 1.0 / float(fps)
         self.last_publish = 0.0
         self.jpeg = None
+        self.state_payload = {}
         self.frame_id = 0
         self.condition = threading.Condition()
 
-    def publish(self, frame):
+    def publish(self, frame, state_payload=None):
         """Publish a preview frame with FPS, width, and JPEG-quality throttling."""
         now = time.time()
+        if state_payload is not None:
+            with self.condition:
+                self.state_payload = state_payload
         if self.min_interval and now - self.last_publish < self.min_interval:
             return
         self.last_publish = now
@@ -122,6 +127,10 @@ class PreviewServer:
                 self.send_stream(conn)
             elif path == '/snapshot.jpg':
                 self.send_snapshot(conn)
+            elif path == '/state.json':
+                self.send_state(conn)
+            elif path == '/events.ndjson':
+                self.send_events(conn)
             else:
                 self.send_response(conn, '404 Not Found', 'text/plain', b'Not found')
         except (socket.error, ValueError, IndexError):
@@ -191,6 +200,21 @@ class PreviewServer:
 """.encode('utf-8')
         self.send_response(conn, '200 OK', 'text/html; charset=utf-8', content)
 
+    def send_state(self, conn):
+        """Send the latest frontend state payload as JSON."""
+        with self.state.condition:
+            payload = self.state.state_payload or {}
+        body = json.dumps(payload, ensure_ascii=True, sort_keys=True).encode('utf-8')
+        self.send_response(conn, '200 OK', 'application/json; charset=utf-8', body)
+
+    def send_events(self, conn):
+        """Send recent workout events as NDJSON for simple frontend polling."""
+        with self.state.condition:
+            payload = self.state.state_payload or {}
+        events = payload.get('workout', {}).get('events', [])
+        body = ''.join(json.dumps(event, ensure_ascii=True, sort_keys=True) + '\n' for event in events).encode('utf-8')
+        self.send_response(conn, '200 OK', 'application/x-ndjson; charset=utf-8', body)
+
     def send_snapshot(self, conn):
         """Send one JPEG snapshot."""
         with self.state.condition:
@@ -245,4 +269,3 @@ def start_preview_server(host, port, quality, width, fps):
     server.start()
     print(f'Preview server started: http://{RASPBOT_AP_IP}:{port}/ (bind {host}:{port})')
     return state, server
-

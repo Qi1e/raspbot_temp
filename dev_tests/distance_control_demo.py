@@ -6,6 +6,7 @@ import argparse
 import math
 import time
 from dataclasses import dataclass
+from dataclasses import replace
 
 from raspbot_posture.cli import add_posture_arguments
 from raspbot_posture.distance_features import extract_distance_features
@@ -112,16 +113,14 @@ class CameraVisionInputProvider:
 
         from raspbot_posture.actions import build_action_registry
         from raspbot_posture.camera import open_camera
-        from raspbot_posture.geometry import build_human_target
         from raspbot_posture.model_paths import ensure_pose_model_available
+        from raspbot_posture.pose_features import PoseFeatureExtractor, classify_posture
         from raspbot_posture.rendering import draw_tracking_target
         from raspbot_posture.state import HumanTarget
-        from raspbot_posture.vision import PostureClassifier
 
         self.args = args
         self.cv2 = cv2
         self.mp = mp
-        self.build_human_target = build_human_target
         self.draw_tracking_target = draw_tracking_target
         self.extract_calibration_features = extract_distance_features
         self.human_target_type = HumanTarget
@@ -153,7 +152,7 @@ class CameraVisionInputProvider:
             ensure_pose_model_available(args.model_complexity)
             source = int(args.source) if str(args.source).isdigit() else args.source
             self.camera = open_camera(source, args.width, args.height)
-            self.classifier = PostureClassifier(min_visibility=args.min_visibility)
+            self.extractor = PoseFeatureExtractor(min_visibility=args.min_visibility)
             self.action_registry = build_action_registry(args)
             self.pose = mp.solutions.pose.Pose(
                 static_image_mode=False,
@@ -234,11 +233,12 @@ class CameraVisionInputProvider:
             return self._empty_tracking_frame(pan_angle, tilt_angle, now)
 
         landmarks = results.pose_landmarks.landmark
-        metrics = self.classifier.measure(landmarks)
-        posture, _ = self.classifier.classify(metrics)
-        human_target = self.build_human_target(landmarks, posture, self.args.min_visibility)
+        features_for_actions = self.extractor.extract(landmarks)
+        posture = classify_posture(features_for_actions)
+        human_target = replace(features_for_actions.target, posture=posture)
+        features_for_actions = replace(features_for_actions, target=human_target)
         features = self.extract_calibration_features(landmarks, human_target, posture, self.args.min_visibility)
-        actions = self.action_registry.update(metrics, posture, human_target)
+        actions = self.action_registry.update(features_for_actions, posture)
         action_active = any(status.active for status in actions.values())
 
         self.last_human_target = human_target

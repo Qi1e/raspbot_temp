@@ -6,6 +6,7 @@ import time
 import cv2
 
 from .camera import open_camera
+from .output import analysis_payload
 from .preview import start_preview_server
 from .rendering import draw_label, draw_tracking_target
 from .state import AnalysisState, FpsMeter, FrameMailbox
@@ -100,7 +101,7 @@ def run_posture_demo(
             draw_label(frame, analysis, camera_fps_meter.tick())
 
             if preview_state:
-                preview_state.publish(frame)
+                preview_state.publish(frame, analysis_payload(analysis, camera_fps_meter.fps))
 
             if args.view_img:
                 cv2.imshow(window_title, frame)

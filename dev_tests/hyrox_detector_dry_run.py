@@ -4,9 +4,10 @@
 
 from argparse import Namespace
 
-from hyrox_actions import detectors
-from hyrox_actions.detectors import build_action_registry
-from hyrox_actions.pose_features import PoseFeatures, TargetBox
+from raspbot_posture import actions as detectors
+from raspbot_posture.actions import build_action_registry
+from raspbot_posture.pose_features import PoseFeatures
+from raspbot_posture.state import HumanTarget
 
 
 def default_args():
@@ -55,7 +56,7 @@ def default_args():
 
 def target(width=0.25, height=0.7, center_x=0.5, center_y=0.55):
     """Synthetic confident target box."""
-    return TargetBox(
+    return HumanTarget(
         detected=True,
         center_x=center_x,
         width=width,

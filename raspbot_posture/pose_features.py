@@ -1,22 +1,10 @@
-"""Pose feature extraction for HYROX action detectors."""
+"""Pose feature extraction shared by posture, action, tracking, and workouts."""
 
 import time
 from dataclasses import dataclass, field
 
 from raspbot_posture.geometry import angle, clip01, distance, landmark_visible, midpoint
-
-
-@dataclass(frozen=True)
-class TargetBox:
-    """Normalized visible-body box."""
-
-    detected: bool = False
-    center_x: float = 0.5
-    center_y: float = 0.5
-    width: float = 0.0
-    height: float = 0.0
-    area: float = 0.0
-    confidence: float = 0.0
+from raspbot_posture.state import HumanTarget
 
 
 @dataclass(frozen=True)
@@ -58,7 +46,7 @@ class PoseFeatures:
     right_elbow_angle: float = 0.0
     left_shoulder_angle: float = 0.0
     right_shoulder_angle: float = 0.0
-    target: TargetBox = field(default_factory=TargetBox)
+    target: HumanTarget = field(default_factory=HumanTarget)
     updated_at: float = 0.0
 
     def key_angles(self):
@@ -103,7 +91,7 @@ class PoseFeatures:
 
 
 class PoseFeatureExtractor:
-    """Convert MediaPipe landmarks into HYROX-friendly features."""
+    """Convert MediaPipe landmarks into reusable body and joint features."""
 
     def __init__(self, min_visibility=0.55):
         import mediapipe as mp
@@ -119,11 +107,11 @@ class PoseFeatureExtractor:
         """Return whether all named landmarks pass the visibility threshold."""
         return all(landmark_visible(self.get(landmarks, name), self.min_visibility) for name in names)
 
-    def target_box(self, landmarks):
-        """Estimate a normalized visible-body box."""
+    def target_box(self, landmarks, posture='Body detected'):
+        """Estimate a normalized visible-body target."""
         visible_points = [lm for lm in landmarks if landmark_visible(lm, self.min_visibility)]
         if len(visible_points) < 4:
-            return TargetBox()
+            return HumanTarget(posture='No person', updated_at=time.time())
 
         min_x = clip01(min(lm.x for lm in visible_points))
         max_x = clip01(max(lm.x for lm in visible_points))
@@ -132,7 +120,7 @@ class PoseFeatureExtractor:
         width = max_x - min_x
         height = max_y - min_y
         confidence = sum(lm.visibility for lm in visible_points) / float(len(visible_points))
-        return TargetBox(
+        return HumanTarget(
             detected=True,
             center_x=clip01((min_x + max_x) / 2.0),
             center_y=clip01((min_y + max_y) / 2.0),
@@ -140,6 +128,8 @@ class PoseFeatureExtractor:
             height=height,
             area=width * height,
             confidence=confidence,
+            posture=posture,
+            updated_at=time.time(),
         )
 
     def extract(self, landmarks):

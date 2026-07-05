@@ -28,10 +28,50 @@ class ActionStatus:
 
     name: str
     count: int = 0
+    target_count: int = 0
     stage: str = 'unknown'
     active: bool = False
     confidence: float = 0.0
+    rep_quality: float = 0.0
+    details: dict = field(default_factory=dict)
     updated_at: float = 0.0
+
+
+@dataclass(frozen=True)
+class WorkoutStatus:
+    """Current workout/program state for preview and frontend consumers."""
+
+    session_id: str = ''
+    program_name: str = ''
+    current_station: str = ''
+    current_action: str = ''
+    station_index: int = 0
+    total_stations: int = 0
+    target_count: int = 0
+    current_count: int = 0
+    elapsed_ms: int = 0
+    action_progress: float = 0.0
+    overall_progress: float = 0.0
+    completed: bool = False
+    events: tuple = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class TrackingStatus:
+    """Small tracking summary exposed to overlays and frontend JSON."""
+
+    enabled: bool = False
+    mode: str = ''
+    reason: str = ''
+    distance_m: object = None
+    distance_state: str = 'unknown'
+    pan_error_degrees: float = 0.0
+    tilt_error_degrees: float = 0.0
+    body_yaw_error_degrees: float = 0.0
+    chassis_motion_direction: str = 'stop'
+    chassis_direction_degrees: float = 90.0
+    motion_allowed: bool = False
+    frozen: bool = False
 
 
 @dataclass(frozen=True)
@@ -43,6 +83,10 @@ class PoseAnalysis:
     squat_count: int = 0
     squat_stage: str = 'unknown'
     actions: dict = field(default_factory=dict)
+    workout: WorkoutStatus = field(default_factory=WorkoutStatus)
+    tracking: TrackingStatus = field(default_factory=TrackingStatus)
+    pose_features: object = None
+    frontend_payload: dict = field(default_factory=dict)
     inference_fps: float = 0.0
     latency_ms: float = 0.0
     target: HumanTarget = field(default_factory=HumanTarget)
@@ -138,4 +182,3 @@ class FpsMeter:
         else:
             self.fps = self.fps * self.smoothing + instant * (1.0 - self.smoothing)
         return self.fps
-

@@ -1,10 +1,9 @@
-"""JSONL/NDJSON recording for HYROX action and joint-angle samples."""
+"""JSONL/NDJSON recording for action and joint-angle samples."""
 
 import json
 import queue
 import threading
 import time
-import uuid
 from pathlib import Path
 from urllib import request
 from urllib.parse import urlparse

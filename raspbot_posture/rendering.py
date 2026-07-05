@@ -20,9 +20,9 @@ def draw_tracking_target(frame, target):
 
 
 def draw_label(frame, analysis, camera_fps):
-    """Draw posture, FPS, and squat count in the top-left overlay."""
-    box_width = max(220, min(frame.shape[1] - 20, 470))
-    cv2.rectangle(frame, (10, 10), (10 + box_width, 118), (16, 19, 22), -1)
+    """Draw posture, workout, action, and tracking state in the overlay."""
+    box_width = max(360, min(frame.shape[1] - 20, 760))
+    cv2.rectangle(frame, (10, 10), (10 + box_width, 178), (16, 19, 22), -1)
     cv2.putText(
         frame,
         f'Posture: {analysis.posture}',
@@ -32,6 +32,9 @@ def draw_label(frame, analysis, camera_fps):
         analysis.color,
         2,
     )
+    workout = analysis.workout
+    station = 'Complete' if workout.completed else f'{workout.station_index}/{workout.total_stations} {workout.current_station}'
+    progress = f'{workout.current_count}/{workout.target_count}' if workout.target_count else '-'
     cv2.putText(
         frame,
         f'Cam: {camera_fps:.1f} FPS  Infer: {analysis.inference_fps:.1f} FPS',
@@ -43,11 +46,41 @@ def draw_label(frame, analysis, camera_fps):
     )
     cv2.putText(
         frame,
-        f'Squats: {analysis.squat_count}  Stage: {analysis.squat_stage}',
+        f'Workout: {workout.program_name or "-"}  Station: {station}  Progress: {progress}',
         (20, 98),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.62,
+        0.58,
         (230, 240, 245),
         2,
     )
-
+    counts = []
+    for name, label in (('squat', 'Squat'), ('lunge', 'Lunge'), ('burpee', 'Burpee')):
+        status = analysis.actions.get(name)
+        if status is not None:
+            counts.append(f'{label} {status.count}:{status.stage}')
+    cv2.putText(
+        frame,
+        '  '.join(counts) if counts else 'Actions: -',
+        (20, 126),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.56,
+        (230, 240, 245),
+        2,
+    )
+    tracking = analysis.tracking
+    if tracking.enabled:
+        tracking_text = (
+            f'Tracking: {tracking.mode} {tracking.distance_state} '
+            f'move={tracking.chassis_motion_direction} frozen={int(tracking.frozen)}'
+        )
+    else:
+        tracking_text = 'Tracking: disabled'
+    cv2.putText(
+        frame,
+        tracking_text[:96],
+        (20, 154),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.56,
+        (230, 240, 245),
+        2,
+    )

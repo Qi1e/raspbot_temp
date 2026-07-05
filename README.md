@@ -15,38 +15,52 @@ Raspbot 姿态识别与姿态跟随控制工程。仓库的可维护功能代码
 
 ## 运行入口
 
-默认姿态识别预览：
+项目外部只保留一个入口：
 
 ```bash
 python3 posture_demo.py
 ```
 
-同一个入口切换运行模式：
+默认进入 `full` 模式：摄像头、MediaPipe 姿态识别、HYROX 动作计数、赛事进度、网页预览和完整 `tracking_*` 同步追踪链路都会启动。为了避免在非树莓派环境误打硬件，默认只 dry-run 打印/计算控制指令，不发送 I2C 电机和舵机命令。
+
+实车控制：
+
+```bash
+python3 posture_demo.py --live-control
+```
+
+只看摄像头和识别效果：
 
 ```bash
 python3 posture_demo.py --run-mode posture
 python3 posture_demo.py --run-mode camera
-python3 posture_demo.py --run-mode steering
-python3 posture_demo.py --run-mode full
 ```
 
 四种运行模式：
 
-- `posture`：姿态识别、人体目标框、动作判断和网页预览，不发送硬件指令。默认模式。
+- `full`：默认模式。姿态识别、动作计数、HYROX 赛事编排、网页状态输出、完整同步追踪控制。
+- `posture`：姿态识别、人体目标框、动作判断和网页预览，不发送硬件指令。
 - `camera`：仅摄像头和网页预览，不启动 MediaPipe，不发送硬件指令。
-- `steering`：姿态推理、人体目标跟踪、云台转向、车身原地转向。
-- `full`：在 `steering` 基础上打开距离控制测试分支。
+- `steering`：旧的保守短脉冲跟随路径，保留用于对比和调试。
 
 无硬件调试：
 
 ```bash
-python3 posture_demo.py --run-mode steering --dry-run-control --control-debug
+python3 posture_demo.py --dry-run-control --print-motors --print-servos
 ```
 
 默认网页预览地址：
 
 ```text
 http://<raspberry-pi-ip>:8080/
+```
+
+前端/调试接口：
+
+```text
+http://<raspberry-pi-ip>:8080/state.json
+http://<raspberry-pi-ip>:8080/events.ndjson
+http://<raspberry-pi-ip>:8080/stream.mjpg
 ```
 
 ## 包体结构
@@ -62,8 +76,12 @@ raspbot_posture/
 ├── model_paths.py      # MediaPipe 离线模型检查
 ├── state.py            # PoseAnalysis、HumanTarget、ActionStatus 等共享状态
 ├── geometry.py         # 关键点几何计算和人体目标框
-├── vision.py           # 姿态特征提取和基础姿态分类
-├── actions.py          # 深蹲计数和动作检测扩展点
+├── pose_features.py    # 统一人体特征、关节角度、人体目标框
+├── vision.py           # 旧基础姿态分类，保留兼容
+├── actions.py          # 深蹲、箭步蹲、波比跳计数状态机和仲裁
+├── workout.py          # HYROX-style 赛事编排和进度状态
+├── output.py           # 前端 JSON payload 序列化
+├── recorder.py         # JSONL/NDJSON 动作与关节数据记录
 ├── inference.py        # MediaPipe 推理线程和分析结果组装
 ├── rendering.py        # 预览画面文字、人体框绘制
 ├── hardware.py         # Raspbot I2C 硬件最小适配
@@ -77,52 +95,47 @@ raspbot_posture/
 ├── tracking_estimator.py # 目标距离、云台偏转、底盘方向估计
 ├── tracking_control.py # 距离规划、轮速混合、车身 yaw 决策
 ├── tracking_driver.py  # 同步追踪用连续舵机/电机驱动
+├── tracking_app.py     # posture_demo 默认 full 模式完整追踪运行时
 └── tracking_log.py     # 同步追踪 CSV/参数日志
 ```
 
-## HYROX 动作扩展
+## 动作、赛事和记录
 
-HYROX 扩展以旁路方式新增，不修改 `raspbot_posture/` 包体：
+HYROX 动作能力已经融入 `raspbot_posture/` 包体，不再保留独立 `hyrox_action_demo.py` 或 `hyrox_actions/` 入口。`posture_demo.py` 会在同一条 MediaPipe 推理链路中完成：
 
-```text
-hyrox_action_demo.py      # HYROX 动作识别和记录入口
-hyrox_actions/
-├── detectors.py          # 深蹲、箭步蹲、波比跳计数状态机
-├── pose_features.py      # 关键关节角度和人体框特征
-├── recorder.py           # JSONL/NDJSON 角度、动作记录和可选远端上传
-└── overlay.py            # 预览叠字
-```
+- 统一人体特征提取：人体框、肩宽、躯干高度、关键关节角度、可见性。
+- 动作计数：深蹲、箭步蹲、波比跳。
+- 动作仲裁：箭步蹲优先处理 split-stance，波比跳阶段会阻止深蹲/箭步蹲误计。
+- HYROX-style 赛事编排：当前项目、目标次数、当前次数、总进度、事件。
+- 记录输出：本地 JSONL 备份和可选远端 NDJSON 批量上传。
 
-运行示例：
+记录本地动作数据：
 
 ```bash
-python3 hyrox_action_demo.py --source 0 --record-path records/session.jsonl
+python3 posture_demo.py --record-path records/session.jsonl
 ```
 
-如需把记录实时传到电脑后端，可先约定电脑端监听 `8765` 端口，并提供一个接收 `POST /ingest` 的 demo 服务。receiver 脚本可以放在仓库外，不需要提交到本仓库。树莓派端命令示例：
+同时上传到电脑后端：
 
 ```bash
-python3 hyrox_action_demo.py \
-  --source 0 \
+python3 posture_demo.py \
   --record-path records/local_backup.jsonl \
   --record-url http://<电脑IP>:8765/ingest \
   --record-device-id raspbot_01 \
   --record-keypoints
 ```
 
-远端上传使用 `application/x-ndjson` 批量 HTTP POST，每行一个 JSON 事件；本地 `--record-path` 仍会保留完整备份。上传在后台线程中进行，后端断开不会阻塞动作识别和小车运动控制。当前版本不依赖额外 WebSocket 包，后续前端需要实时展示时，可以由电脑后端把收到的数据再转发给前端。
+远端上传使用 `application/x-ndjson` 批量 HTTP POST，每行一个 JSON 事件；本地 `--record-path` 仍会保留完整备份。上传在后台线程中进行，后端断开不会阻塞动作识别和小车运动控制。
 
-默认推理上限为 12 FPS，默认记录间隔为 0.1 秒。树莓派压力较大时可降回：
+树莓派压力较大时可降低推理和记录频率：
 
 ```bash
-python3 hyrox_action_demo.py --source 0 --inference-fps 8 --record-interval 0.2
+python3 posture_demo.py --inference-fps 8 --record-interval 0.2
 ```
 
-扩展中的深蹲和箭步蹲使用互斥仲裁，明显的 split-stance 骨架特征会优先 favour 箭步蹲，并阻止深蹲抢计数。深蹲默认 `--squat-down-angle` 为 152，并优先看对称腿部骨架与膝角，降低低机位下髋部下沉特征失真的影响；`--squat-min-down-time` 默认 0.4 秒，避免单帧抽搐造成深蹲误计。箭步蹲要求更明确的脚踝展开或髋脚偏移，减少正面深蹲被膝角抖动抢成箭步蹲。
+记录文件包含 `session_start`、`sample`、`rep_event` 和 `session_end` 事件。`sample` 中包含当前姿态、动作阶段、关键关节角度、人体框、可见性、计数状态；开启 `--record-keypoints` 后还会记录肩、肘、腕、髋、膝、踝等关键点坐标。
 
-波比跳按“俯卧撑起身 + 相对摄像头左右方向立定跳远”计数，需经历俯卧撑下降、俯卧撑推起、起身、横向位移、落地阶段，默认 `--burpee-stage-timeout` 为 7.0 秒。`floor_entry` 只作为内部弱候选，不再作为正式显示或阻挡状态；俯卧撑入口优先要求地面姿态、肘角和伸腿证据共同成立。如果低机位导致手臂关键点不可见，只有非常扁平且贴近地面的目标框才允许用 `--burpee-flat-floor-*` 严格入口进入 `pushup_down`，避免深蹲或箭步蹲低位误进波比跳。
-
-记录文件为 JSONL/NDJSON，每行包含 `type`、`session_id`、时间戳、当前动作阶段、关键关节角度、人体框、可见性和计数状态；开启 `--record-keypoints` 时还会记录肩、肘、腕、髋、膝、踝等关键点坐标，供后端动作完成度计算使用。记录事件包括 `session_start`、`sample`、`rep_event` 和 `session_end`。部署到树莓派时，把 `hyrox_action_demo.py` 和 `hyrox_actions/` 放到 Pi 项目目录中，与 `raspbot_posture/` 同级即可。
+前端推荐优先读取 `/state.json`。该接口包含 `posture`、`target`、`actions`、`workout`、`tracking`、`pose_features` 等字段；`/events.ndjson` 可用于拉取近期赛事事件。
 
 ## 已实现功能
 
@@ -130,8 +143,12 @@ python3 hyrox_action_demo.py --source 0 --inference-fps 8 --record-interval 0.2
 - MediaPipe Pose 异步推理，支持推理 FPS 限制。
 - 基础姿态识别：站立、举手、T pose、蹲/坐、左倾、右倾。
 - 人体目标输出：归一化中心点、面积、置信度、当前姿态。
-- 深蹲计数动作检测。
+- 深蹲、箭步蹲、波比跳动作计数和互斥仲裁。
+- HYROX-style 赛事编排、进度状态、事件输出。
+- `/state.json` 和 `/events.ndjson` 前端状态接口。
+- JSONL/NDJSON 动作、关节角度和关键点记录。
 - `posture` / `camera` / `steering` / `full` 四种运行模式。
+- `posture_demo.py` 默认进入 `full` 模式并走完整 `tracking_*` 同步追踪链路。
 - 云台舵机跟随人体目标。
 - 云台偏转持续过大时，车身短脉冲原地转向。
 - 目标丢失停车、退出停车、退出舵机复位。
@@ -145,7 +162,7 @@ python3 hyrox_action_demo.py --source 0 --inference-fps 8 --record-interval 0.2
 
 - 继续扩大远距离样本，特别是 4m 以上的人体估距模型和置信度策略。
 - 完善距离控制安全策略：速度限制、最小安全距离、连续误检保护、动作过程冻结策略。
-- 将同步追踪控制接入正式 `posture_demo.py --run-mode full` 前，继续用 `dev_tests/distance_control_demo.py` 做实车验证。
+- 在树莓派实车上验证 `posture_demo.py --live-control` 的完整 tracking、记录和前端状态输出。
 - 为关键控制逻辑补充可重复的开发测试脚本，所有脚本放在 `dev_tests/`。
 
 ## 开发和测试目录

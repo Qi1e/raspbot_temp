@@ -10,14 +10,16 @@ def add_robot_control_arguments(parser):
     parser.add_argument(
         "--run-mode",
         choices=["posture", "camera", "steering", "full"],
-        default="posture",
+        default="full",
         help=(
             "posture: pose preview; camera: camera preview only; "
             "steering: pan/tilt and body turning; full: also enable distance control"
         ),
     )
 
-    parser.add_argument("--dry-run-control", action="store_true", help="print robot commands without touching hardware")
+    parser.set_defaults(dry_run_control=True)
+    parser.add_argument("--dry-run-control", dest="dry_run_control", action="store_true", help="print robot commands without touching hardware")
+    parser.add_argument("--live-control", dest="dry_run_control", action="store_false", help="send robot commands to Raspbot hardware")
     parser.add_argument("--control-debug", action="store_true", help="print target and control decisions")
     parser.add_argument("--control-log-interval", type=float, default=0.5)
 
@@ -61,6 +63,48 @@ def add_robot_control_arguments(parser):
     parser.add_argument("--freeze-during-action", dest="freeze_during_action", action="store_true")
     parser.add_argument("--no-freeze-during-action", dest="freeze_during_action", action="store_false")
     parser.add_argument("--action-freeze-time", type=float, default=0.9)
+
+    parser.add_argument("--tracking-mode", choices=["camera", "full"], default="full")
+    parser.add_argument("--duration", type=float, default=0.0, help="tracking runtime seconds; 0 runs until Ctrl+C")
+    parser.add_argument("--plan-interval", type=float, default=1.5)
+    parser.add_argument("--max-input-age", type=float, default=0.4)
+    parser.add_argument("--min-confidence", type=float, default=0.3)
+    parser.add_argument("--servo-idle-required", type=float, default=0.4)
+    parser.add_argument("--desired-min-distance", type=float, default=0.8)
+    parser.add_argument("--desired-max-distance", type=float, default=1.2)
+    parser.add_argument("--desired-distance", type=float, default=1.0)
+    parser.add_argument("--max-reasonable-distance", type=float, default=10.0)
+    parser.add_argument("--estimator-min-confidence", type=float, default=0.7)
+    parser.add_argument("--distance-deadband", type=float, default=0.08)
+    parser.add_argument("--min-move-speed", type=float, default=8.0)
+    parser.add_argument("--max-move-speed", type=float, default=22.0)
+    parser.add_argument("--distance-speed-gain", type=float, default=25.0)
+    parser.add_argument("--min-goal-duration", type=float, default=0.15)
+    parser.add_argument("--max-goal-duration", type=float, default=0.45)
+    parser.add_argument("--distance-duration-gain", type=float, default=0.8)
+    parser.add_argument("--body-yaw-deadband-degrees", type=float, default=4.0)
+    parser.add_argument("--body-yaw-gain", type=float, default=0.12)
+    parser.add_argument("--body-yaw-screen-gate-degrees", type=float, default=3.0)
+    parser.add_argument("--max-yaw-speed", type=float, default=3.5)
+    parser.add_argument("--max-wheel-speed", type=int, default=255)
+    parser.add_argument("--horizontal-fov-degrees", type=float, default=62.0)
+    parser.add_argument("--vertical-fov-degrees", type=float, default=49.0)
+    parser.add_argument("--camera-pan-deadband-degrees", type=float, default=3.0)
+    parser.add_argument("--camera-tilt-deadband-degrees", type=float, default=3.0)
+    parser.add_argument("--camera-servo-step", type=float, default=1.0)
+    parser.add_argument("--camera-servo-gain", type=float, default=0.16)
+    parser.add_argument("--yaw-servo-compensation-gain", type=float, default=0.5)
+    parser.add_argument("--yaw-servo-compensation-max-step", type=float, default=0.6)
+    parser.add_argument("--yaw-servo-compensation-deadband", type=float, default=0.5)
+    parser.add_argument("--yaw-servo-compensation-sign", type=int, choices=[-1, 1], default=-1)
+    parser.add_argument("--allow-yaw-during-action", action="store_true")
+    parser.add_argument("--log-dir", default="", help="write run args JSON and control CSV logs into this directory")
+    parser.add_argument("--log-prefix", default="tracking", help="prefix for generated log files")
+    parser.add_argument("--log-interval", type=float, default=0.05)
+    parser.add_argument("--print-motors", action="store_true")
+    parser.add_argument("--print-servos", action="store_true")
+    parser.add_argument("--print-planner", action="store_true")
+    parser.add_argument("--i2c-bus", type=int, default=1)
     return parser
 
 
