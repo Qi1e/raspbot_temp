@@ -75,6 +75,21 @@ class TrackingStatus:
 
 
 @dataclass(frozen=True)
+class ObstacleStatus:
+    """Small ultrasonic obstacle-avoidance summary for logs and preview."""
+
+    enabled: bool = False
+    active: bool = False
+    distance_mm: object = None
+    raw_mm: object = None
+    valid: bool = False
+    phase: str = 'disabled'
+    reason: str = ''
+    cooldown_remaining_s: float = 0.0
+    updated_at: float = 0.0
+
+
+@dataclass(frozen=True)
 class PoseAnalysis:
     """Immutable snapshot produced by one pose inference pass."""
 
@@ -85,6 +100,7 @@ class PoseAnalysis:
     actions: dict = field(default_factory=dict)
     workout: WorkoutStatus = field(default_factory=WorkoutStatus)
     tracking: TrackingStatus = field(default_factory=TrackingStatus)
+    obstacle: ObstacleStatus = field(default_factory=ObstacleStatus)
     pose_features: object = None
     frontend_payload: dict = field(default_factory=dict)
     inference_fps: float = 0.0

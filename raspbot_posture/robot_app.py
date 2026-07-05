@@ -32,7 +32,8 @@ def print_control_summary(args):
         f"pan_deadzone={args.pan_deadzone}, tilt_deadzone={args.tilt_deadzone}, "
         f"servo_step={args.servo_step}, body_turn_speed={args.body_turn_speed}, "
         f"body_pulse={args.body_pulse}, body_cooldown={args.body_cooldown}, "
-        f"distance_control={args.distance_control}"
+        f"distance_control={args.distance_control}, "
+        f"obstacle_avoidance={getattr(args, 'enable_obstacle_avoidance', False)}"
     )
 
 

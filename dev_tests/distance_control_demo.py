@@ -359,9 +359,9 @@ def build_parser():
     parser.add_argument("--action-active", action="store_true", help="simulate squat/gesture activity blocking motion")
     parser.add_argument("--simulate-changes", action="store_true")
 
-    parser.add_argument("--desired-min-distance", type=float, default=0.8)
-    parser.add_argument("--desired-max-distance", type=float, default=1.2)
-    parser.add_argument("--desired-distance", type=float, default=1.0)
+    parser.add_argument("--desired-min-distance", type=float, default=2.7)
+    parser.add_argument("--desired-max-distance", type=float, default=3.3)
+    parser.add_argument("--desired-distance", type=float, default=3.0)
     parser.add_argument(
         "--max-reasonable-distance",
         type=float,

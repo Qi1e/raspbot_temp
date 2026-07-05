@@ -15,8 +15,8 @@ from .target_pose_estimator import TargetPoseConfig, TargetTrackingInputBuilder
 def build_parser():
     parser = argparse.ArgumentParser(description="Check fitted target pose estimator against a calibration CSV")
     parser.add_argument("--input", default="dev_tests/target_distance_samples.csv")
-    parser.add_argument("--desired-min-distance", type=float, default=0.8)
-    parser.add_argument("--desired-max-distance", type=float, default=1.2)
+    parser.add_argument("--desired-min-distance", type=float, default=2.7)
+    parser.add_argument("--desired-max-distance", type=float, default=3.3)
     parser.add_argument("--max-reasonable-distance", type=float, default=10.0)
     parser.add_argument("--min-confidence", type=float, default=0.7)
     return parser

@@ -76,6 +76,21 @@ def tracking_payload(tracking):
     }
 
 
+def obstacle_payload(obstacle):
+    """Return a JSON-safe obstacle-avoidance summary payload."""
+    return {
+        'enabled': obstacle.enabled,
+        'active': obstacle.active,
+        'distance_mm': _round(obstacle.distance_mm),
+        'raw_mm': _round(obstacle.raw_mm),
+        'valid': obstacle.valid,
+        'phase': obstacle.phase,
+        'reason': obstacle.reason,
+        'cooldown_remaining_s': _round(obstacle.cooldown_remaining_s, 2),
+        'updated_at': _round(obstacle.updated_at, 3),
+    }
+
+
 def pose_features_payload(features):
     """Return compact pose feature payload, omitting raw landmarks."""
     if features is None:
@@ -107,6 +122,7 @@ def analysis_payload(analysis, camera_fps=None):
         'actions': {name: action_payload(status) for name, status in analysis.actions.items()},
         'workout': workout_payload(analysis.workout),
         'tracking': tracking_payload(analysis.tracking),
+        'obstacle': obstacle_payload(analysis.obstacle),
         'pose_features': pose_features_payload(analysis.pose_features),
         'updated_at': _round(analysis.updated_at, 3),
     }

@@ -8,9 +8,9 @@ from .distance_models import agreement_confidence, model_confidence, select_mode
 
 @dataclass(frozen=True)
 class TargetPoseConfig:
-    desired_min_distance: float = 0.8
-    desired_max_distance: float = 1.2
-    desired_distance: float = 1.0
+    desired_min_distance: float = 2.7
+    desired_max_distance: float = 3.3
+    desired_distance: float = 3.0
     max_reasonable_distance: float = 10.0
     x_deadzone: float = 0.08
     y_deadzone: float = 0.10

@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from dataclasses import replace
 
+from .avoidance import ObstacleAvoidanceController
 from .actions import build_action_registry
 from .camera import open_camera
 from .distance_features import extract_distance_features
@@ -13,10 +14,11 @@ from .pose_features import PoseFeatureExtractor, classify_posture
 from .preview import start_preview_server
 from .recorder import JsonlRecorder
 from .rendering import draw_label, draw_tracking_target
-from .state import FpsMeter, PoseAnalysis, TrackingStatus
+from .state import FpsMeter, ObstacleStatus, PoseAnalysis, TrackingStatus
 from .tracking_control import (
     DistancePlanner,
     MotionGoal,
+    YawDecision,
     distance_input_from_tracking,
     mix_translation_yaw,
     yaw_from_tracking,
@@ -24,6 +26,7 @@ from .tracking_control import (
 from .tracking_driver import TrackingRobotDriver
 from .tracking_estimator import TargetPoseConfig, TargetTrackingInputBuilder
 from .tracking_log import TrackingLogger
+from .ultrasonic import UltrasonicMonitor
 from .workout import WorkoutSession, build_hyrox_program
 
 
@@ -56,9 +59,9 @@ def _action_active(actions):
 
 def _tracking_config(args):
     return TargetPoseConfig(
-        desired_min_distance=_arg(args, 'desired_min_distance', 0.8),
-        desired_max_distance=_arg(args, 'desired_max_distance', 1.2),
-        desired_distance=_arg(args, 'desired_distance', 1.0),
+        desired_min_distance=_arg(args, 'desired_min_distance', 2.7),
+        desired_max_distance=_arg(args, 'desired_max_distance', 3.3),
+        desired_distance=_arg(args, 'desired_distance', 3.0),
         max_reasonable_distance=_arg(args, 'max_reasonable_distance', 10.0),
         min_confidence=_arg(args, 'estimator_min_confidence', 0.7),
         pan_center=_arg(args, 'pan_center', 90.0),
@@ -101,6 +104,29 @@ def _tracking_status(args, tracking, frozen=False):
     )
 
 
+def _obstacle_status(reading, decision, enabled):
+    if decision is None:
+        return ObstacleStatus(
+            enabled=bool(enabled),
+            raw_mm=getattr(reading, 'raw_mm', None),
+            valid=getattr(reading, 'valid', False),
+            phase='disabled' if not enabled else 'normal',
+            reason=getattr(reading, 'reason', ''),
+            updated_at=getattr(reading, 'updated_at', 0.0),
+        )
+    return ObstacleStatus(
+        enabled=bool(enabled),
+        active=decision.active,
+        distance_mm=decision.distance_mm,
+        raw_mm=getattr(reading, 'raw_mm', None),
+        valid=getattr(reading, 'valid', False),
+        phase=decision.phase,
+        reason=decision.reason,
+        cooldown_remaining_s=decision.cooldown_remaining_s,
+        updated_at=getattr(reading, 'updated_at', 0.0),
+    )
+
+
 def _record_config(args):
     return {
         'source': str(args.source),
@@ -120,9 +146,9 @@ def _record_config(args):
         },
         'tracking': {
             'mode': args.tracking_mode,
-            'desired_distance': _arg(args, 'desired_distance', 1.0),
-            'desired_min_distance': _arg(args, 'desired_min_distance', 0.8),
-            'desired_max_distance': _arg(args, 'desired_max_distance', 1.2),
+            'desired_distance': _arg(args, 'desired_distance', 3.0),
+            'desired_min_distance': _arg(args, 'desired_min_distance', 2.7),
+            'desired_max_distance': _arg(args, 'desired_max_distance', 3.3),
         },
     }
 
@@ -246,6 +272,15 @@ def run_full_tracking_demo(args):
         print_servos=_arg(args, 'print_servos', False),
     )
     driver.configure_servos(args.pan_center, args.tilt_center)
+    obstacle_enabled = bool(_arg(args, 'enable_obstacle_avoidance', False)) and args.tracking_mode != 'camera'
+    ultrasonic = UltrasonicMonitor(
+        bot=driver.bot,
+        enabled=obstacle_enabled and args.live,
+        poll_interval=_arg(args, 'ultrasonic_poll_interval', 0.05),
+        buffer_size=_arg(args, 'ultrasonic_filter_size', 5),
+    )
+    avoider = ObstacleAvoidanceController(args, enabled=obstacle_enabled)
+    ultrasonic.start()
 
     camera_fps = FpsMeter()
     inference_fps = FpsMeter()
@@ -288,7 +323,14 @@ def run_full_tracking_demo(args):
 
             tracking_frame = last_tracking_frame
             tracking = tracking_frame.tracking
-            yaw_decision = yaw_from_tracking(tracking, args, now, tracking_frame.action_active)
+            ultrasonic_reading = ultrasonic.latest()
+            obstacle_decision = avoider.update(ultrasonic_reading.distance_mm, now)
+            obstacle_status = _obstacle_status(ultrasonic_reading, obstacle_decision, obstacle_enabled)
+
+            tracking_yaw_decision = yaw_from_tracking(tracking, args, now, tracking_frame.action_active)
+            yaw_decision = tracking_yaw_decision
+            if obstacle_decision.active:
+                yaw_decision = YawDecision(0.0, "obstacle avoidance")
             servo_update = driver.update_camera(tracking, args, now, yaw_speed=yaw_decision.speed)
             sample = distance_input_from_tracking(
                 tracking,
@@ -297,7 +339,9 @@ def run_full_tracking_demo(args):
                 action_active=tracking_frame.action_active,
                 updated_at=tracking_frame.updated_at,
             )
-            if args.tracking_mode == 'camera':
+            if obstacle_decision.active:
+                goal = obstacle_decision.goal
+            elif args.tracking_mode == 'camera':
                 goal = MotionGoal(active=False, reason='camera tracking only')
             else:
                 goal = planner.update(sample, now)
@@ -322,11 +366,14 @@ def run_full_tracking_demo(args):
                 direction,
                 wheels,
                 driver,
+                obstacle_status,
             )
 
+            frozen = tracking_frame.action_active or obstacle_decision.active
             analysis = replace(
                 tracking_frame.analysis,
-                tracking=_tracking_status(args, tracking, frozen=tracking_frame.action_active),
+                tracking=_tracking_status(args, tracking, frozen=frozen),
+                obstacle=obstacle_status,
             )
             if analysis.landmarks is not None:
                 mp.solutions.drawing_utils.draw_landmarks(frame, analysis.landmarks, mp.solutions.pose.POSE_CONNECTIONS)
@@ -341,6 +388,7 @@ def run_full_tracking_demo(args):
                     break
             time.sleep(interval)
     finally:
+        ultrasonic.stop()
         driver.stop()
         recorder.close()
         logger.close()

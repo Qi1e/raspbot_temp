@@ -22,7 +22,7 @@ def draw_tracking_target(frame, target):
 def draw_label(frame, analysis, camera_fps):
     """Draw posture, workout, action, and tracking state in the overlay."""
     box_width = max(360, min(frame.shape[1] - 20, 760))
-    cv2.rectangle(frame, (10, 10), (10 + box_width, 178), (16, 19, 22), -1)
+    cv2.rectangle(frame, (10, 10), (10 + box_width, 202), (16, 19, 22), -1)
     cv2.putText(
         frame,
         f'Posture: {analysis.posture}',
@@ -79,6 +79,24 @@ def draw_label(frame, analysis, camera_fps):
         frame,
         tracking_text[:96],
         (20, 154),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.56,
+        (230, 240, 245),
+        2,
+    )
+    obstacle = analysis.obstacle
+    if obstacle.enabled:
+        distance = '-' if obstacle.distance_mm is None else f'{obstacle.distance_mm:.0f}mm'
+        obstacle_text = (
+            f'Obstacle: {obstacle.phase} active={int(obstacle.active)} '
+            f'dist={distance} {obstacle.reason}'
+        )
+    else:
+        obstacle_text = 'Obstacle: disabled'
+    cv2.putText(
+        frame,
+        obstacle_text[:96],
+        (20, 182),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.56,
         (230, 240, 245),
