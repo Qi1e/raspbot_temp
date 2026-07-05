@@ -8,3 +8,19 @@ __pycache__/
 /temp
 temp
 records/
+
+# HYROX desktop software local artifacts
+.env
+*.env
+.venv/
+node_modules/
+dist/
+*.tsbuildinfo
+*.sqlite
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+hyrox_software_design/.bootstrap/
+hyrox_software_design/backend/data/
+hyrox_software_design/frontend/dist/
+hyrox_software_design/frontend/node_modules/

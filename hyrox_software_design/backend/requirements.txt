@@ -1,0 +1,8 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+bleak==0.22.3
+
+# macOS Bluetooth backend dependencies used by bleak.
+pyobjc-core>=10.3,<11
+pyobjc-framework-CoreBluetooth>=10.3,<11
+pyobjc-framework-libdispatch>=10.3,<11

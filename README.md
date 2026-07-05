@@ -120,12 +120,14 @@ python3 posture_demo.py --record-path records/session.jsonl
 ```bash
 python3 posture_demo.py \
   --record-path records/local_backup.jsonl \
-  --record-url http://<电脑IP>:8765/ingest \
+  --record-url http://<电脑IP>:8000/api/v1/robot/ingest \
   --record-device-id raspbot_01 \
   --record-keypoints
 ```
 
 远端上传使用 `application/x-ndjson` 批量 HTTP POST，每行一个 JSON 事件；本地 `--record-path` 仍会保留完整备份。上传在后台线程中进行，后端断开不会阻塞动作识别和小车运动控制。
+
+推荐用 `--duration <秒数>` 做一次完整记录的自动结束；自然退出时 `recorder.close()` 会发送 `session_end`。如果手动 Ctrl+C 后电脑端没有收到 `session_end`，在 HYROX 前端点击“结束记录”或调用后端 `POST /api/v1/sessions/<session_id>/finish` 做兜底收口。
 
 树莓派压力较大时可降低推理和记录频率：
 

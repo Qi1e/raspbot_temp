@@ -1,0 +1,9 @@
+bleak==0.22.3
+
+# macOS Bluetooth backend dependencies.
+# Keep these in the range required by bleak 0.22.3. Newer pyobjc releases can be
+# selected accidentally and fail to build on Python 3.9 with recent Apple SDKs.
+pyobjc-core>=10.3,<11
+pyobjc-framework-Cocoa>=10.3,<11
+pyobjc-framework-CoreBluetooth>=10.3,<11
+pyobjc-framework-libdispatch>=10.3,<11
