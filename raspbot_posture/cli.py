@@ -74,13 +74,15 @@ def add_posture_arguments(parser):
     parser.add_argument('--record-path', default='', help='optional JSONL path for action and joint-angle samples')
     parser.add_argument('--record-url', default='', help='optional HTTP/HTTPS endpoint for NDJSON batch upload')
     parser.add_argument('--record-session-id', default='', help='optional session id for local and remote records')
-    parser.add_argument('--record-device-id', default='raspbot', help='device id included in local and remote records')
+    parser.add_argument('--record-device-id', default='Bot 01', help='device id included in local and remote records')
     parser.add_argument('--record-interval', type=float, default=0.1, help='minimum seconds between recorded samples')
     parser.add_argument('--record-min-confidence', type=float, default=0.55, help='minimum target confidence for recording')
     parser.add_argument('--record-upload-batch-size', type=int, default=10, help='samples per remote NDJSON upload batch')
     parser.add_argument('--record-upload-interval', type=float, default=1.0, help='maximum seconds between remote upload batches')
     parser.add_argument('--record-upload-queue-size', type=int, default=300, help='maximum queued remote record events')
-    parser.add_argument('--record-keypoints', action='store_true', help='include selected joint coordinates in records')
+    parser.set_defaults(record_keypoints=True)
+    parser.add_argument('--record-keypoints', dest='record_keypoints', action='store_true', help='include selected joint coordinates in records')
+    parser.add_argument('--no-record-keypoints', dest='record_keypoints', action='store_false', help='exclude selected joint coordinates from records')
     return parser
 
 

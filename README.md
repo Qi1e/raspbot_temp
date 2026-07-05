@@ -23,6 +23,13 @@ python3 posture_demo.py
 
 默认先进入语音等待，不占用摄像头和 tracking 资源。语音识别到 `num=95` 后，程序会自动启动完整 `full` 模式：摄像头、MediaPipe 姿态识别、HYROX 动作计数、赛事进度、网页预览和完整 `tracking_*` 同步追踪链路都会启动；识别到 `num=96` 后停止本次 tracking 并回到语音等待；识别到 `num=104` 后终止语音入口和 tracking 子进程。`num=97` 目前只预留，不改变 tracking 状态。
 
+不带 `--run-mode` 时，即使提供记录上传参数，也仍然先进入语音等待；这些参数会在 `num=95` 启动 tracking 子进程时自动传入。例如：
+
+```bash
+python3 posture_demo.py \
+  --record-url http://<电脑IP>:8000/api/v1/robot/ingest
+```
+
 跳过语音入口，显式进入实车控制模式：
 
 ```bash
@@ -126,9 +133,7 @@ python3 posture_demo.py --record-path records/session.jsonl
 ```bash
 python3 posture_demo.py \
   --record-path records/local_backup.jsonl \
-  --record-url http://<电脑IP>:8000/api/v1/robot/ingest \
-  --record-device-id raspbot_01 \
-  --record-keypoints
+  --record-url http://<电脑IP>:8000/api/v1/robot/ingest
 ```
 
 远端上传使用 `application/x-ndjson` 批量 HTTP POST，每行一个 JSON 事件；本地 `--record-path` 仍会保留完整备份。上传在后台线程中进行，后端断开不会阻塞动作识别和小车运动控制。
@@ -141,7 +146,7 @@ python3 posture_demo.py \
 python3 posture_demo.py --inference-fps 8 --record-interval 0.2
 ```
 
-记录文件包含 `session_start`、`sample`、`rep_event` 和 `session_end` 事件。`sample` 中包含当前姿态、动作阶段、关键关节角度、人体框、可见性、计数状态；开启 `--record-keypoints` 后还会记录肩、肘、腕、髋、膝、踝等关键点坐标。
+记录文件包含 `session_start`、`sample`、`rep_event` 和 `session_end` 事件。`sample` 中包含当前姿态、动作阶段、关键关节角度、人体框、可见性、计数状态；默认设备编号为 `Bot 01`，并默认记录肩、肘、腕、髋、膝、踝等关键点坐标。需要临时减少上传数据量时，可以加 `--no-record-keypoints`。
 
 前端推荐优先读取 `/state.json`。该接口包含 `posture`、`target`、`actions`、`workout`、`tracking`、`pose_features` 等字段；`/events.ndjson` 可用于拉取近期赛事事件。
 

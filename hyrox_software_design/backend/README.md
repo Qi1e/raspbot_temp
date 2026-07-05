@@ -168,9 +168,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/hr/ble/connect \
 python3 posture_demo.py \
   --source 0 \
   --record-path records/local_backup.jsonl \
-  --record-url http://<电脑IP>:8000/api/v1/robot/ingest \
-  --record-device-id raspbot_01 \
-  --record-keypoints
+  --record-url http://<电脑IP>:8000/api/v1/robot/ingest
 ```
 
 后端收到 `session_start` 后自动创建 session。
@@ -182,9 +180,7 @@ python3 posture_demo.py \
   --source 0 \
   --duration 600 \
   --record-path records/local_backup.jsonl \
-  --record-url http://<电脑IP>:8000/api/v1/robot/ingest \
-  --record-device-id raspbot_01 \
-  --record-keypoints
+  --record-url http://<电脑IP>:8000/api/v1/robot/ingest
 ```
 
 ### 5. 前端或 API 查看
@@ -454,7 +450,7 @@ curl http://127.0.0.1:8000/api/v1/live/20260703_130100
     "status": "live"
   },
   "robot": {
-    "device_id": "raspbot_01",
+    "device_id": "Bot 01",
     "last_sample_age_ms": 240,
     "target_confidence": 0.91,
     "pose_quality": "good",

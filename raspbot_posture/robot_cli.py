@@ -138,8 +138,13 @@ def build_parser():
     return parser
 
 
+def _has_option(argv, option):
+    """Return True when argv contains --option or --option=value."""
+    return any(item == option or item.startswith(option + "=") for item in argv)
+
+
 def _uses_voice_supervisor(args, argv):
-    return not args.voice_child and len(argv) == 0
+    return not args.voice_child and not _has_option(argv, "--run-mode")
 
 
 def parse_args(argv=None):
@@ -158,8 +163,8 @@ def parse_args(argv=None):
 def apply_control_default(args, argv):
     """Default explicit robot modes to live control while keeping bare startup safe."""
     argv = list(argv)
-    explicit_control = "--dry-run-control" in argv or "--live-control" in argv
-    explicit_run_mode = "--run-mode" in argv
+    explicit_control = _has_option(argv, "--dry-run-control") or _has_option(argv, "--live-control")
+    explicit_run_mode = _has_option(argv, "--run-mode")
     if args.dry_run_control is None:
         args.dry_run_control = not (explicit_run_mode and args.run_mode in ("steering", "full"))
     if not explicit_control and explicit_run_mode and args.run_mode in ("steering", "full"):
@@ -179,7 +184,7 @@ def main(argv=None):
     if _uses_voice_supervisor(args, argv):
         from .voice_supervisor import run_voice_supervisor
 
-        raise SystemExit(run_voice_supervisor())
+        raise SystemExit(run_voice_supervisor(child_args=argv))
 
     from .robot_app import run_robot_control_demo
 

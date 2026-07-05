@@ -71,9 +71,7 @@ Raspbot record-url candidates:
 
 ```bash
 python3 posture_demo.py \
-  --record-url http://192.168.1.23:8000/api/v1/robot/ingest \
-  --record-device-id raspbot_01 \
-  --record-keypoints
+  --record-url http://192.168.1.23:8000/api/v1/robot/ingest
 ```
 
 本阶段不修改小车端代码；小车仍然通过现有 `--record-url` 参数上传 NDJSON。
@@ -198,9 +196,7 @@ curl http://127.0.0.1:8000/api/v1/hr/ble/status
 python3 posture_demo.py \
   --source 0 \
   --record-path records/local_backup.jsonl \
-  --record-url http://<电脑IP>:8000/api/v1/robot/ingest \
-  --record-device-id raspbot_01 \
-  --record-keypoints
+  --record-url http://<电脑IP>:8000/api/v1/robot/ingest
 ```
 
 后端收到 `session_start` 后会自动创建 session，不需要前端或小车提前创建。

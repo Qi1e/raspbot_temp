@@ -26,8 +26,8 @@ def _load_speech():
     return Speech()
 
 
-def _tracking_command():
-    return [
+def _tracking_command(child_args=None):
+    command = [
         sys.executable,
         "-m",
         "raspbot_posture",
@@ -35,13 +35,16 @@ def _tracking_command():
         "--run-mode",
         "full",
     ]
+    if child_args:
+        command.extend(child_args)
+    return command
 
 
-def _start_process():
+def _start_process(child_args=None):
     kwargs = {}
     if os.name != "nt":
         kwargs["preexec_fn"] = os.setsid
-    return subprocess.Popen(_tracking_command(), **kwargs)
+    return subprocess.Popen(_tracking_command(child_args), **kwargs)
 
 
 def _signal_process(process, sig):
@@ -87,8 +90,9 @@ def _acknowledge(speech, code):
         print(f"Voice acknowledgement failed for code {code}: {exc}")
 
 
-def run_voice_supervisor(poll_interval=0.2):
+def run_voice_supervisor(poll_interval=0.2, child_args=None):
     """Wait for speech commands and launch or stop the tracking child."""
+    child_args = list(child_args or [])
     speech = _load_speech()
     process = None
     print("Voice control ready. Say command 95 to start, 96 to pause, 104 to stop.")
@@ -107,7 +111,7 @@ def run_voice_supervisor(poll_interval=0.2):
                 _acknowledge(speech, code)
                 if process is None or process.poll() is not None:
                     print("Voice command 95: starting full tracking.")
-                    process = _start_process()
+                    process = _start_process(child_args)
                 else:
                     print("Voice command 95 ignored: tracking is already running.")
             elif code == PAUSE_CODE:
