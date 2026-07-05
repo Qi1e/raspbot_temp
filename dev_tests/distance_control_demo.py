@@ -48,7 +48,15 @@ class SimulatedVisionInputProvider:
             desired_max_distance=args.desired_max_distance,
             desired_distance=args.desired_distance,
             max_reasonable_distance=args.max_reasonable_distance,
+            distance_x_deadzone=args.distance_x_deadzone,
+            distance_backward_x_deadzone=args.distance_backward_x_deadzone,
             min_confidence=args.estimator_min_confidence,
+            distance_confidence_threshold=args.distance_confidence_threshold,
+            distance_stability_window_s=args.distance_stability_window,
+            distance_stability_max_range_m=args.distance_stability_max_range,
+            distance_stability_min_confidence=args.distance_stability_min_confidence,
+            distance_stability_min_target_confidence=args.distance_stability_min_target_confidence,
+            distance_stability_bonus=args.distance_stability_bonus,
             pan_center=args.pan_center,
             tilt_center=args.tilt_center,
             body_turn_pan_deadzone=args.body_yaw_deadband_degrees,
@@ -89,6 +97,7 @@ class SimulatedVisionInputProvider:
             torso_height=torso_height,
             tilt_angle=tilt_angle,
             pan_angle=pan_angle,
+            now=now,
         )
         return TrackingFrame(
             tracking=tracking,
@@ -139,7 +148,15 @@ class CameraVisionInputProvider:
             desired_max_distance=args.desired_max_distance,
             desired_distance=args.desired_distance,
             max_reasonable_distance=args.max_reasonable_distance,
+            distance_x_deadzone=args.distance_x_deadzone,
+            distance_backward_x_deadzone=args.distance_backward_x_deadzone,
             min_confidence=args.estimator_min_confidence,
+            distance_confidence_threshold=args.distance_confidence_threshold,
+            distance_stability_window_s=args.distance_stability_window,
+            distance_stability_max_range_m=args.distance_stability_max_range,
+            distance_stability_min_confidence=args.distance_stability_min_confidence,
+            distance_stability_min_target_confidence=args.distance_stability_min_target_confidence,
+            distance_stability_bonus=args.distance_stability_bonus,
             pan_center=args.pan_center,
             tilt_center=args.tilt_center,
             body_turn_pan_deadzone=args.body_yaw_deadband_degrees,
@@ -213,6 +230,7 @@ class CameraVisionInputProvider:
             torso_height=0.0,
             tilt_angle=tilt_angle,
             pan_angle=pan_angle,
+            now=now,
         )
         self.last_human_target = self.human_target_type(updated_at=now)
         self.last_landmarks = None
@@ -254,6 +272,7 @@ class CameraVisionInputProvider:
             torso_height=features["torso_height"],
             tilt_angle=tilt_angle,
             pan_angle=pan_angle,
+            now=now,
         )
         return TrackingFrame(
             tracking=tracking,
@@ -346,6 +365,8 @@ def build_parser():
     parser.add_argument("--max-input-age", type=float, default=0.4)
     parser.add_argument("--min-confidence", type=float, default=0.3)
     parser.add_argument("--servo-idle-required", type=float, default=0.4)
+    parser.add_argument("--distance-x-deadzone", type=float, default=0.12)
+    parser.add_argument("--distance-backward-x-deadzone", type=float, default=0.32)
 
     parser.add_argument("--center-x", type=float, default=0.35)
     parser.add_argument("--center-y", type=float, default=0.48)
@@ -369,6 +390,12 @@ def build_parser():
         help="discard distance estimates above this many meters; set <=0 to disable",
     )
     parser.add_argument("--estimator-min-confidence", type=float, default=0.7)
+    parser.add_argument("--distance-confidence-threshold", type=float, default=0.35)
+    parser.add_argument("--distance-stability-window", type=float, default=1.5)
+    parser.add_argument("--distance-stability-max-range", type=float, default=0.3)
+    parser.add_argument("--distance-stability-min-confidence", type=float, default=0.25)
+    parser.add_argument("--distance-stability-min-target-confidence", type=float, default=0.75)
+    parser.add_argument("--distance-stability-bonus", type=float, default=0.12)
 
     parser.add_argument("--distance-deadband", type=float, default=0.08)
     parser.add_argument("--min-move-speed", type=float, default=8.0)

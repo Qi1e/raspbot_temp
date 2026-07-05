@@ -63,7 +63,15 @@ def _tracking_config(args):
         desired_max_distance=_arg(args, 'desired_max_distance', 3.3),
         desired_distance=_arg(args, 'desired_distance', 3.0),
         max_reasonable_distance=_arg(args, 'max_reasonable_distance', 10.0),
+        distance_x_deadzone=_arg(args, 'distance_x_deadzone', 0.12),
+        distance_backward_x_deadzone=_arg(args, 'distance_backward_x_deadzone', 0.32),
         min_confidence=_arg(args, 'estimator_min_confidence', 0.7),
+        distance_confidence_threshold=_arg(args, 'distance_confidence_threshold', 0.35),
+        distance_stability_window_s=_arg(args, 'distance_stability_window', 1.5),
+        distance_stability_max_range_m=_arg(args, 'distance_stability_max_range', 0.3),
+        distance_stability_min_confidence=_arg(args, 'distance_stability_min_confidence', 0.25),
+        distance_stability_min_target_confidence=_arg(args, 'distance_stability_min_target_confidence', 0.75),
+        distance_stability_bonus=_arg(args, 'distance_stability_bonus', 0.12),
         pan_center=_arg(args, 'pan_center', 90.0),
         tilt_center=_arg(args, 'tilt_center', 50.0),
         body_turn_pan_deadzone=_arg(args, 'body_yaw_deadband_degrees', 4.0),
@@ -84,6 +92,7 @@ def _empty_tracking(builder, pan_angle, tilt_angle):
         torso_height=0.0,
         tilt_angle=tilt_angle,
         pan_angle=pan_angle,
+        now=time.time(),
     )
 
 
@@ -187,6 +196,7 @@ def _process_frame(frame, pose, extractor, action_registry, workout_session, bui
     active = _action_active(actions)
     workout = workout_session.update(actions)
     recorder.record(posture, features, actions, landmarks)
+    now = time.time()
     tracking = builder.from_features(
         detected=target.detected,
         area=target.area,
@@ -198,6 +208,7 @@ def _process_frame(frame, pose, extractor, action_registry, workout_session, bui
         torso_height=distance_features['torso_height'],
         tilt_angle=driver.tilt_angle,
         pan_angle=driver.pan_angle,
+        now=now,
     )
     squat = actions.get('squat')
     analysis = PoseAnalysis(
@@ -213,7 +224,7 @@ def _process_frame(frame, pose, extractor, action_registry, workout_session, bui
         latency_ms=(time.time() - started_at) * 1000.0,
         target=target,
         landmarks=results.pose_landmarks if args.draw_landmarks else None,
-        updated_at=time.time(),
+        updated_at=now,
     )
     return TrackingFrame(analysis=analysis, tracking=tracking, action_active=active, updated_at=analysis.updated_at)
 

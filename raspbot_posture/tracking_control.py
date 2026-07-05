@@ -10,6 +10,7 @@ class DistanceControlInput:
     confidence: float
     pan_error_degrees: float
     distance_error_m: float
+    distance_state: str
     servo_idle_s: float
     posture: str
     action_active: bool
@@ -130,7 +131,7 @@ class DistancePlanner:
         self.goal = MotionGoal(active=False)
 
     def update(self, sample, now):
-        if now < self.next_plan_at:
+        if not self._needs_immediate_replan(sample, now) and now < self.next_plan_at:
             return self.goal
 
         self.next_plan_at = now + self.args.plan_interval
@@ -139,13 +140,29 @@ class DistancePlanner:
             print(f"planner goal={self.goal}")
         return self.goal
 
+    def _is_fresh(self, sample, now):
+        return now - sample.updated_at <= self.args.max_input_age
+
+    def _is_too_close(self, sample):
+        return sample.distance_error_m < -abs(float(self.args.distance_deadband))
+
+    def _needs_immediate_replan(self, sample, now):
+        return (
+            sample.detected
+            and self._is_fresh(sample, now)
+            and sample.confidence >= self.args.min_confidence
+            and self._is_too_close(sample)
+        )
+
     def plan(self, sample, now):
         if not sample.detected:
             return MotionGoal(active=False, reason="target lost")
-        if now - sample.updated_at > self.args.max_input_age:
+        if not self._is_fresh(sample, now):
             return MotionGoal(active=False, reason="stale input")
         if sample.confidence < self.args.min_confidence:
             return MotionGoal(active=False, reason="low confidence")
+        if self._is_too_close(sample) and sample.motion_allowed:
+            return self._motion_goal(sample, now, "too close")
         if sample.servo_idle_s < self.args.servo_idle_required:
             return MotionGoal(active=False, reason="servo moving")
         if sample.action_active:
@@ -156,12 +173,13 @@ class DistancePlanner:
             return MotionGoal(active=False, reason="distance ok")
 
         if sample.distance_error_m > 0:
-            direction = sample.chassis_direction_degrees
             reason = "too far"
         else:
-            direction = sample.chassis_direction_degrees
             reason = "too close"
 
+        return self._motion_goal(sample, now, reason)
+
+    def _motion_goal(self, sample, now, reason):
         error = abs(sample.distance_error_m)
         speed = clamp(
             self.args.min_move_speed + error * self.args.distance_speed_gain,
@@ -175,7 +193,7 @@ class DistancePlanner:
         )
         return MotionGoal(
             active=True,
-            direction_degrees=direction % 360.0,
+            direction_degrees=sample.chassis_direction_degrees % 360.0,
             speed=speed,
             expires_at=now + duration,
             reason=reason,
