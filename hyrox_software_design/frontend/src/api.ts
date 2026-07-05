@@ -1,4 +1,4 @@
-import type { BleDevice, BleStatus, LiveSnapshot, NotificationSettings, SessionRecord } from "./types";
+import type { BleDevice, BleStatus, LiveSnapshot, NotificationSettings, SessionRecord, SessionReport } from "./types";
 
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
@@ -60,4 +60,8 @@ export function updateNotificationSettings(payload: Partial<NotificationSettings
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
+}
+
+export function getSessionReport(sessionId: string) {
+  return fetchJson<SessionReport>(`/api/v1/analysis/${encodeURIComponent(sessionId)}/report`);
 }

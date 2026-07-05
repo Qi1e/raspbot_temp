@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   Activity,
+  ArrowLeft,
+  BarChart3,
   Bell,
   BellOff,
   Bluetooth,
@@ -9,7 +11,9 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Flame,
   HeartPulse,
+  ListChecks,
   PlugZap,
   RefreshCw,
   Search,
@@ -25,11 +29,12 @@ import {
   getLatestSession,
   getLiveSnapshot,
   getNotificationSettings,
+  getSessionReport,
   getSessions,
   scanHeartRateDevices,
   updateNotificationSettings
 } from "./api";
-import type { BleDevice, BleStatus, LiveEvent, LiveSnapshot, NotificationSettings, SessionRecord } from "./types";
+import type { BleDevice, BleStatus, LiveEvent, LiveSnapshot, NotificationSettings, SessionRecord, SessionReport } from "./types";
 
 const DEFAULT_CAMERA_PREVIEW_URL = "http://192.168.1.11:8080/";
 
@@ -39,11 +44,15 @@ const snapshot = ref<LiveSnapshot | null>(null);
 const bleDevices = ref<BleDevice[]>([]);
 const bleStatus = ref<BleStatus | null>(null);
 const notificationSettings = ref<NotificationSettings | null>(null);
+const report = ref<SessionReport | null>(null);
 const selectedSessionId = ref("");
+const reportSessionId = ref("");
+const view = ref<"console" | "report">("console");
 const cameraPreviewEnabled = ref(localStorage.getItem("hyrox.camera.enabled") === "true");
 const cameraPreviewUrl = ref(localStorage.getItem("hyrox.camera.url") || DEFAULT_CAMERA_PREVIEW_URL);
 const loading = ref({
   refresh: false,
+  report: false,
   scan: false,
   connect: "",
   disconnect: false,
@@ -114,6 +123,10 @@ const jointRows = computed(() => {
   }));
 });
 const sortedEvents = computed(() => [...(snapshot.value?.events || [])].reverse());
+const reportStartedText = computed(() => formatDateTime(report.value?.session.started_at_ms));
+const reportEndedText = computed(() => formatDateTime(report.value?.session.ended_at_ms));
+const reportHeartRows = computed(() => report.value?.heart_rate.table || []);
+const reportMovementRows = computed(() => report.value?.movement.counts || []);
 
 function formatDuration(seconds: number) {
   const total = Math.max(0, Math.round(seconds || 0));
@@ -123,6 +136,16 @@ function formatDuration(seconds: number) {
   if (hours) return `${hours}小时 ${minutes}分 ${secs}秒`;
   if (minutes) return `${minutes}分 ${secs}秒`;
   return `${secs}秒`;
+}
+
+function formatDateTime(timestamp?: number | null) {
+  if (!timestamp) return "--";
+  return new Date(timestamp).toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatPercent(value?: number | null) {
+  if (typeof value !== "number") return "--";
+  return `${Math.round(value)}%`;
 }
 
 function actionLabel(action: string) {
@@ -216,6 +239,21 @@ async function refreshAll() {
     setError(error);
   } finally {
     loading.value.refresh = false;
+  }
+}
+
+async function loadReport(sessionId: string) {
+  if (!sessionId) return;
+  loading.value.report = true;
+  errorMessage.value = "";
+  try {
+    report.value = await getSessionReport(sessionId);
+    reportSessionId.value = sessionId;
+    selectedSessionId.value = sessionId;
+  } catch (error) {
+    setError(error);
+  } finally {
+    loading.value.report = false;
   }
 }
 
@@ -322,6 +360,34 @@ function selectSession(sessionId: string) {
   connectLiveSocket(sessionId);
 }
 
+function openReport(sessionId: string) {
+  view.value = "report";
+  window.location.hash = `#/report/${encodeURIComponent(sessionId)}`;
+  loadReport(sessionId);
+}
+
+function showConsole() {
+  view.value = "console";
+  report.value = null;
+  reportSessionId.value = "";
+  window.location.hash = "";
+  if (activeSessionId.value) {
+    refreshSnapshot(activeSessionId.value);
+    connectLiveSocket(activeSessionId.value);
+  }
+}
+
+function syncRouteFromHash() {
+  const match = window.location.hash.match(/^#\/report\/(.+)$/);
+  if (match) {
+    const sessionId = decodeURIComponent(match[1]);
+    view.value = "report";
+    loadReport(sessionId);
+    return;
+  }
+  view.value = "console";
+}
+
 function saveCameraSettings() {
   localStorage.setItem("hyrox.camera.enabled", String(cameraPreviewEnabled.value));
   localStorage.setItem("hyrox.camera.url", cameraPreviewUrl.value);
@@ -357,6 +423,8 @@ function setError(error: unknown) {
 }
 
 onMounted(() => {
+  syncRouteFromHash();
+  window.addEventListener("hashchange", syncRouteFromHash);
   refreshAll();
   pollingTimer = window.setInterval(() => {
     if (activeSessionId.value) refreshSnapshot(activeSessionId.value);
@@ -365,6 +433,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("hashchange", syncRouteFromHash);
   if (socket) socket.close();
   if (pollingTimer) window.clearInterval(pollingTimer);
 });
@@ -375,14 +444,27 @@ onBeforeUnmount(() => {
     <header class="topbar">
       <div>
         <p class="eyebrow">HYROX Training Console</p>
-        <h1>实时训练控制台</h1>
+        <h1>{{ view === "report" ? "运动报告" : "实时训练控制台" }}</h1>
       </div>
       <div class="topbar-actions">
-        <span class="status-pill" :class="wsState">
+        <button v-if="view === 'report'" class="tool-button" @click="showConsole">
+          <ArrowLeft :size="16" />
+          返回
+        </button>
+        <span v-if="view === 'console'" class="status-pill" :class="wsState">
           <Wifi :size="16" />
           {{ statusLabel(wsState) }}
         </span>
-        <button class="icon-button" title="刷新" :disabled="loading.refresh" @click="refreshAll">
+        <button
+          v-if="view === 'report'"
+          class="icon-button"
+          title="刷新报告"
+          :disabled="loading.report || !reportSessionId"
+          @click="loadReport(reportSessionId)"
+        >
+          <RefreshCw :size="18" :class="{ spin: loading.report }" />
+        </button>
+        <button v-else class="icon-button" title="刷新" :disabled="loading.refresh" @click="refreshAll">
           <RefreshCw :size="18" :class="{ spin: loading.refresh }" />
         </button>
       </div>
@@ -393,6 +475,144 @@ onBeforeUnmount(() => {
       <span>{{ errorMessage }}</span>
     </section>
 
+    <template v-if="view === 'report'">
+      <section v-if="report" class="report-summary-grid">
+        <div class="metric-panel primary">
+          <div class="metric-icon"><Timer :size="22" /></div>
+          <span>本次运动时间</span>
+          <strong>{{ formatDuration(report.summary.duration_s) }}</strong>
+          <small>{{ reportStartedText }} - {{ reportEndedText }}</small>
+        </div>
+        <div class="metric-panel">
+          <div class="metric-icon"><ListChecks :size="22" /></div>
+          <span>动作总量</span>
+          <strong>{{ report.summary.total_reps }}</strong>
+          <small>动作事件 {{ report.summary.action_event_count }} 条</small>
+        </div>
+        <div class="metric-panel">
+          <div class="metric-icon"><BarChart3 :size="22" /></div>
+          <span>综合完成度</span>
+          <strong>{{ report.summary.completion_score }}%</strong>
+          <small>{{ report.summary.completion_level }}</small>
+        </div>
+        <div class="metric-panel">
+          <div class="metric-icon"><Flame :size="22" /></div>
+          <span>燃烧热量估计</span>
+          <strong>{{ report.summary.calories_kcal }}</strong>
+          <small>kcal · MET {{ report.calories.estimated_met }}</small>
+        </div>
+      </section>
+
+      <section v-if="report" class="report-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>运动数量</h2>
+              <p>{{ report.movement.completion.reference.name }}</p>
+            </div>
+          </div>
+          <div class="report-counts">
+            <div v-for="item in reportMovementRows" :key="item.action" class="report-count-row">
+              <div>
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.count }} / {{ item.target }}</span>
+              </div>
+              <meter min="0" max="100" :value="item.completion_percent"></meter>
+              <small>{{ formatPercent(item.completion_percent) }}</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>综合完成度分析</h2>
+              <p>{{ report.movement.completion.reference.note }}</p>
+            </div>
+            <span class="status-pill recording">{{ report.movement.completion.level }}</span>
+          </div>
+          <div class="analysis-breakdown">
+            <div>
+              <span>训练量</span>
+              <strong>{{ report.movement.completion.volume_score }}%</strong>
+            </div>
+            <div>
+              <span>动作均衡</span>
+              <strong>{{ report.movement.completion.balance_score }}%</strong>
+            </div>
+            <div>
+              <span>姿态数据质量</span>
+              <strong>{{ report.movement.completion.pose_quality_score }}%</strong>
+            </div>
+          </div>
+          <div class="report-note">
+            姿态样本 {{ report.movement.completion.pose_quality.sample_count }} 条，
+            平均目标置信度 {{ formatPercent((report.movement.completion.pose_quality.avg_target_confidence || 0) * 100) }}。
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>热量估计</h2>
+              <p>成人参考体重 {{ report.calories.adult_reference.weight_kg }}kg · 最大心率参考 {{ report.calories.adult_reference.max_heart_rate_bpm }}</p>
+            </div>
+            <span class="status-pill">{{ report.calories.kcal }} kcal</span>
+          </div>
+          <div class="calorie-formula">{{ report.calories.method }}</div>
+          <div class="analysis-breakdown">
+            <div>
+              <span>运动分钟</span>
+              <strong>{{ report.calories.duration_min }}</strong>
+            </div>
+            <div>
+              <span>平均心率</span>
+              <strong>{{ report.summary.avg_bpm ?? "--" }}</strong>
+            </div>
+            <div>
+              <span>最高心率</span>
+              <strong>{{ report.summary.max_bpm ?? "--" }}</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel heart-table-panel">
+          <div class="panel-header">
+            <div>
+              <h2>心率时间轴</h2>
+              <p>{{ report.heart_rate.stats.sample_count }} 条心率样本</p>
+            </div>
+          </div>
+          <div class="heart-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间轴</th>
+                  <th>心率</th>
+                  <th>区间</th>
+                  <th>附近动作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in reportHeartRows" :key="`${row.timestamp_ms}-${row.bpm}`">
+                  <td>{{ row.time }}</td>
+                  <td>{{ row.bpm ?? "--" }}</td>
+                  <td>{{ row.zone || "--" }}</td>
+                  <td>{{ row.nearest_action?.text || "--" }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="!reportHeartRows.length" class="empty-state">暂无心率样本</div>
+          </div>
+        </section>
+      </section>
+
+      <section v-else class="empty-state report-loading">
+        {{ loading.report ? "正在生成报告" : "暂无报告数据" }}
+      </section>
+    </template>
+
+    <template v-else>
     <section class="overview-grid">
       <div class="metric-panel primary">
         <div class="metric-icon"><Timer :size="22" /></div>
@@ -424,7 +644,7 @@ onBeforeUnmount(() => {
       <section class="panel session-panel">
         <div class="panel-header">
           <div>
-            <h2>训练状态</h2>
+            <h2>运动记录</h2>
             <p>{{ activeSessionId || "暂无 session" }}</p>
           </div>
           <div class="button-row">
@@ -456,10 +676,10 @@ onBeforeUnmount(() => {
             v-for="session in sessions.slice(0, 6)"
             :key="session.id"
             :class="{ active: session.id === activeSessionId }"
-            @click="selectSession(session.id)"
+            @click="openReport(session.id)"
           >
             <span>{{ session.id }}</span>
-            <small>{{ statusLabel(session.status) }}</small>
+            <small>{{ statusLabel(session.status) }} · 点击查看报告</small>
           </button>
         </div>
       </section>
@@ -623,5 +843,6 @@ onBeforeUnmount(() => {
         <div v-if="!sortedEvents.length" class="empty-state">暂无事件</div>
       </section>
     </section>
+    </template>
   </main>
 </template>

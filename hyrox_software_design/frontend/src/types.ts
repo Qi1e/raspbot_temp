@@ -97,3 +97,106 @@ export interface NotificationSettings {
   pushover_enabled: boolean;
   notify_reps: boolean;
 }
+
+export interface SessionReport {
+  type: "session_report";
+  session_id: string;
+  generated_at_ms: number;
+  session: {
+    id: string;
+    status: string;
+    device_id?: string | null;
+    started_at_ms?: number | null;
+    ended_at_ms?: number | null;
+    duration_s: number;
+    time_source: string;
+  };
+  summary: {
+    duration_s: number;
+    total_reps: number;
+    completion_score: number;
+    completion_level: string;
+    calories_kcal: number;
+    avg_bpm?: number | null;
+    max_bpm?: number | null;
+    min_bpm?: number | null;
+    heart_rate_sample_count: number;
+    robot_sample_count: number;
+    action_event_count: number;
+  };
+  heart_rate: {
+    table: HeartRateReportRow[];
+    stats: {
+      sample_count: number;
+      avg_bpm?: number | null;
+      max_bpm?: number | null;
+      min_bpm?: number | null;
+    };
+    time_axis: {
+      started_at_ms?: number | null;
+      description: string;
+    };
+  };
+  movement: {
+    counts: MovementCountRow[];
+    raw_counts: Record<string, number>;
+    completion: CompletionAnalysis;
+  };
+  calories: {
+    kcal: number;
+    duration_min: number;
+    estimated_met: number;
+    adult_reference: {
+      weight_kg: number;
+      max_heart_rate_bpm: number;
+    };
+    method: string;
+    confidence: string;
+  };
+  notes: string[];
+}
+
+export interface HeartRateReportRow {
+  t_ms?: number | null;
+  time: string;
+  timestamp_ms?: number | null;
+  bpm?: number | null;
+  zone?: string | null;
+  nearest_action?: {
+    action?: string | null;
+    label: string;
+    count?: number | null;
+    delta_ms: number;
+    text: string;
+  } | null;
+}
+
+export interface MovementCountRow {
+  action: string;
+  label: string;
+  count: number;
+  target: number;
+  completion_percent: number;
+}
+
+export interface CompletionAnalysis {
+  score: number;
+  level: string;
+  total_reps: number;
+  target_reps: number;
+  volume_score: number;
+  balance_score: number;
+  pose_quality_score: number;
+  pose_quality: {
+    score: number;
+    avg_target_confidence?: number | null;
+    full_body_visible_rate?: number | null;
+    sample_count: number;
+  };
+  by_action: MovementCountRow[];
+  reference: {
+    name: string;
+    targets: Record<string, number>;
+    note: string;
+  };
+}
