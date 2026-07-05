@@ -32,7 +32,7 @@ def add_posture_arguments(parser):
     parser.add_argument('--squat-stable-frames', type=int, default=1, help='legacy shorthand for squat down/up confirmation frames')
     parser.add_argument('--squat-down-frames', type=int, default=None, help='down samples required before entering squat down stage')
     parser.add_argument('--squat-up-frames', type=int, default=None, help='up samples required before counting one squat')
-    parser.add_argument('--squat-down-angle', type=float, default=145.0, help='knee angle threshold for squat down')
+    parser.add_argument('--squat-down-angle', type=float, default=152.0, help='knee angle threshold for squat down')
     parser.add_argument('--squat-up-angle', type=float, default=155.0, help='knee angle threshold for standing up')
     parser.add_argument('--squat-max-angle-gap', type=float, default=25.0, help='max left/right knee angle gap for squat detection')
     parser.add_argument('--squat-max-stance-width', type=float, default=1.25, help='max ankle span divided by shoulder width for squat detection')

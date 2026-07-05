@@ -38,6 +38,8 @@ def print_control_summary(args):
 
 def run_robot_control_demo(args):
     """Run posture preview plus optional robot steering and distance control."""
+    if getattr(args, "dry_run_control", None) is None:
+        args.dry_run_control = True
     apply_robot_run_mode(args)
     if args.run_mode == "full":
         from .tracking_app import run_full_tracking_demo

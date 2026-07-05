@@ -21,13 +21,16 @@ Raspbot 姿态识别与姿态跟随控制工程。仓库的可维护功能代码
 python3 posture_demo.py
 ```
 
-默认进入 `full` 模式：摄像头、MediaPipe 姿态识别、HYROX 动作计数、赛事进度、网页预览和完整 `tracking_*` 同步追踪链路都会启动。为了避免在非树莓派环境误打硬件，默认只 dry-run 打印/计算控制指令，不发送 I2C 电机和舵机命令。
+默认先进入语音等待，不占用摄像头和 tracking 资源。语音识别到 `num=95` 后，程序会自动启动完整 `full` 模式：摄像头、MediaPipe 姿态识别、HYROX 动作计数、赛事进度、网页预览和完整 `tracking_*` 同步追踪链路都会启动；识别到 `num=96` 后停止本次 tracking 并回到语音等待；识别到 `num=104` 后终止语音入口和 tracking 子进程。`num=97` 目前只预留，不改变 tracking 状态。
 
-实车控制：
+跳过语音入口，显式进入实车控制模式：
 
 ```bash
-python3 posture_demo.py --live-control
+python3 posture_demo.py --run-mode full
+python3 posture_demo.py --run-mode steering
 ```
+
+显式 `--run-mode full` / `--run-mode steering` 会直接发送实车控制命令；如果只想模拟控制输出，加回 `--dry-run-control`。
 
 只看摄像头和识别效果：
 
@@ -48,6 +51,8 @@ python3 posture_demo.py --run-mode camera
 ```bash
 python3 posture_demo.py --dry-run-control --print-motors --print-servos
 ```
+
+注意：语音入口内部会自动启动 tracking 子进程，用户不需要输入内部参数；直接运行 `python3 posture_demo.py` 即可。需要调试 tracking 本体时，再使用上面的 `--run-mode` 命令。
 
 默认网页预览地址：
 
@@ -90,6 +95,7 @@ raspbot_posture/
 ├── robot_controller.py # 云台跟随、车身转向、距离控制分支
 ├── robot_app.py        # 控制模式接入共享主循环
 ├── robot_cli.py        # 控制版参数
+├── voice_supervisor.py # 语音入口，按 num=95/96/104 管理 tracking 子进程
 ├── distance_features.py # 人体估距特征提取
 ├── distance_models.py  # 标定后的距离模型
 ├── tracking_estimator.py # 目标距离、云台偏转、底盘方向估计
@@ -148,7 +154,8 @@ python3 posture_demo.py --inference-fps 8 --record-interval 0.2
 - `/state.json` 和 `/events.ndjson` 前端状态接口。
 - JSONL/NDJSON 动作、关节角度和关键点记录。
 - `posture` / `camera` / `steering` / `full` 四种运行模式。
-- `posture_demo.py` 默认进入 `full` 模式并走完整 `tracking_*` 同步追踪链路。
+- `posture_demo.py` 默认进入语音入口，`num=95` 后启动完整 `tracking_*` 同步追踪链路。
+- `num=96` 停止本次 tracking 并继续等待语音，`num=104` 强制结束程序。
 - 云台舵机跟随人体目标。
 - 云台偏转持续过大时，车身短脉冲原地转向。
 - 目标丢失停车、退出停车、退出舵机复位。
